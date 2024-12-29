@@ -11,6 +11,7 @@ interface EditorToolbarProps {
   onCopyCode: () => void;
   onDownloadCode: () => void;
   onUndo: () => void;
+  currentFileName?: string;
 }
 
 export const EditorToolbar = ({
@@ -22,13 +23,21 @@ export const EditorToolbar = ({
   onCopyCode,
   onDownloadCode,
   onUndo,
+  currentFileName,
 }: EditorToolbarProps) => {
   return (
     <div className="border-b px-4 flex justify-between items-center">
-      <TabsList>
-        <TabsTrigger value="editor">Code Editor</TabsTrigger>
-        <TabsTrigger value="preview">Preview</TabsTrigger>
-      </TabsList>
+      <div className="flex items-center gap-4">
+        <TabsList>
+          <TabsTrigger value="editor">Code Editor</TabsTrigger>
+          <TabsTrigger value="preview">Preview</TabsTrigger>
+        </TabsList>
+        {currentFileName && (
+          <span className="text-sm text-muted-foreground">
+            Editing: {currentFileName}
+          </span>
+        )}
+      </div>
       <div className="flex items-center gap-2">
         <Button
           variant="outline"

@@ -5,10 +5,11 @@ import { memoryFS } from "@/utils/memoryFileSystem";
 import { useState, useEffect } from "react";
 
 interface FilePaneProps {
-  onFileSelect: (content: string) => void;
+  onFileSelect: (fileName: string) => void;
+  currentFileName?: string;
 }
 
-export const FilePane = ({ onFileSelect }: FilePaneProps) => {
+export const FilePane = ({ onFileSelect, currentFileName }: FilePaneProps) => {
   const [files, setFiles] = useState<string[]>([]);
 
   useEffect(() => {
@@ -23,12 +24,8 @@ export const FilePane = ({ onFileSelect }: FilePaneProps) => {
     // We could add a subscription system to memoryFS to trigger updates
   }, []);
 
-  const handleFileClick = (path: string) => {
-    const content = memoryFS.readFile(path);
-    if (content) {
-      onFileSelect(content);
-      console.log('File selected:', path);
-    }
+  const handleFileClick = (fileName: string) => {
+    onFileSelect(fileName);
   };
 
   const handleDeleteFile = (path: string) => {
@@ -47,7 +44,9 @@ export const FilePane = ({ onFileSelect }: FilePaneProps) => {
           {files.map((file) => (
             <div
               key={file}
-              className="group flex items-center justify-between p-2 rounded-md hover:bg-accent text-sm"
+              className={`group flex items-center justify-between p-2 rounded-md hover:bg-accent text-sm ${
+                currentFileName === file ? 'bg-accent' : ''
+              }`}
             >
               <Button
                 variant="ghost"

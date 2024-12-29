@@ -14,12 +14,15 @@ import { FilePane } from "@/components/CodeEditor/FilePane";
 import { memoryFS } from "@/utils/memoryFileSystem";
 import type { editor } from "monaco-editor";
 
+const DEFAULT_FILE_NAME = 'untitled.tsx';
+
 const Design = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const project = location.state?.project;
   const [messages, setMessages] = useState<Array<{ role: 'user' | 'assistant', content: string }>>([]);
   const [input, setInput] = useState("");
+  const [currentFileName, setCurrentFileName] = useState(DEFAULT_FILE_NAME);
   const [code, setCode] = useState(`// Welcome to the code editor
 function App() {
   return (
@@ -29,8 +32,15 @@ function App() {
   const [showLineNumbers, setShowLineNumbers] = useState(true);
   const [wordWrap, setWordWrap] = useState<"on" | "off">("on");
   const { toast } = useToast();
-
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
+
+  // Initialize the default file in memory if it doesn't exist
+  useEffect(() => {
+    if (!memoryFS.readFile(DEFAULT_FILE_NAME)) {
+      memoryFS.writeFile(DEFAULT_FILE_NAME, code);
+      console.log('Initialized default file in memory');
+    }
+  }, []);
 
   const handleUndo = () => {
     console.log('Attempting to undo...');
@@ -76,37 +86,25 @@ function App() {
     if (value) {
       setCode(value);
       // Store the code in memory file system
-      memoryFS.writeFile('current-code.tsx', value);
-      console.log('Code updated and stored in memory');
+      memoryFS.writeFile(currentFileName, value);
+      console.log(`Code updated and stored in memory for file: ${currentFileName}`);
     }
   };
-
-  useEffect(() => {
-    // Try to load existing code from memory on component mount
-    const savedCode = memoryFS.readFile('current-code.tsx');
-    if (savedCode) {
-      setCode(savedCode);
-      console.log('Loaded existing code from memory');
-    }
-  }, []);
 
   const handleDownloadCode = () => {
     const blob = new Blob([code], { type: 'text/plain' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'code.tsx';
+    a.download = currentFileName;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     window.URL.revokeObjectURL(url);
     
-    // Also save to memory
-    memoryFS.writeFile('downloaded-code.tsx', code);
-    
     toast({
       title: "Code downloaded",
-      description: "Your code has been downloaded and saved to memory.",
+      description: `Your code has been downloaded as ${currentFileName}`,
     });
   };
 
@@ -126,9 +124,13 @@ function App() {
     }
   };
 
-  const handleFileSelect = (content: string) => {
-    setCode(content);
-    console.log('File content loaded into editor');
+  const handleFileSelect = (fileName: string) => {
+    const content = memoryFS.readFile(fileName);
+    if (content) {
+      setCurrentFileName(fileName);
+      setCode(content);
+      console.log('File content loaded into editor:', fileName);
+    }
   };
 
   return (
