@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { ChevronRight, ChevronDown, Folder, File, Plus, Trash2, Search } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
@@ -21,6 +21,7 @@ interface FileTreeProps {
   onCreateFile: (path: string) => void;
   onCreateDirectory: (path: string) => void;
   onDeleteItem: (path: string) => void;
+  onRefresh?: (refresh: () => void) => void;
 }
 
 const TreeNode = ({
@@ -191,30 +192,39 @@ export function FileTree({
   onFileSelect,
   onCreateFile,
   onCreateDirectory,
-  onDeleteItem
+  onDeleteItem,
+  onRefresh
 }: FileTreeProps) {
   const [fileTree, setFileTree] = useState<FileTreeItem[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const { toast } = useToast();
 
-  useEffect(() => {
-    const loadFileTree = async () => {
-      try {
-        const files = await fileApi.listFiles();
-        const tree = buildFileTree(files);
-        setFileTree(tree);
-      } catch (error) {
-        console.error('Error loading file tree:', error);
-        toast({
-          title: "Error",
-          description: "Failed to load file tree",
-          variant: "destructive",
-        });
-      }
-    };
+  const loadFileTree = useCallback(async () => {
+    try {
+      const files = await fileApi.listFiles();
+      const tree = buildFileTree(files);
+      setFileTree(tree);
+    } catch (error) {
+      console.error('Error loading file tree:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load file tree",
+        variant: "destructive",
+      });
+    }
+  }, [toast]);
 
+  // Initial load
+  useEffect(() => {
     loadFileTree();
   }, []);
+
+  // Pass the refresh callback to parent
+  useEffect(() => {
+    if (onRefresh) {
+      onRefresh(loadFileTree);
+    }
+  }, [onRefresh]);
 
   const buildFileTree = (files: string[]): FileTreeItem[] => {
     const root: { [key: string]: FileTreeItem } = {};

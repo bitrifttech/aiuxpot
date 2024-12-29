@@ -1,54 +1,33 @@
-import { Home, Settings } from "lucide-react";
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarHeader,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-} from "@/components/ui/sidebar";
-
-const menuItems = [
-  {
-    title: "Dashboard",
-    icon: Home,
-    url: "/",
-  },
-  {
-    title: "Settings",
-    icon: Settings,
-    url: "/settings",
-  },
-];
+import { Sidebar, SidebarHeader, SidebarNav, SidebarNavItem } from "./ui/sidebar";
+import { Home, Settings, FileCode } from "lucide-react";
+import { Link } from "react-router-dom";
 
 export function AppSidebar() {
   return (
-    <Sidebar>
-      <SidebarHeader className="p-4">
-        <h2 className="text-lg font-semibold">aiuxpot</h2>
+    <Sidebar defaultOpen>
+      <SidebarHeader>
+        <h2 className="text-lg font-semibold">UX Design Platform</h2>
       </SidebarHeader>
-      <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel>Navigation</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {menuItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
-                    <a href={item.url}>
-                      <item.icon />
-                      <span>{item.title}</span>
-                    </a>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-      </SidebarContent>
+      <SidebarNav>
+        <SidebarNavItem asChild>
+          <Link to="/" className="flex items-center gap-2">
+            <Home className="h-4 w-4" />
+            <span>Home</span>
+          </Link>
+        </SidebarNavItem>
+        <SidebarNavItem asChild>
+          <Link to="/design/new" className="flex items-center gap-2">
+            <FileCode className="h-4 w-4" />
+            <span>New Design</span>
+          </Link>
+        </SidebarNavItem>
+        <SidebarNavItem asChild>
+          <Link to="/settings" className="flex items-center gap-2">
+            <Settings className="h-4 w-4" />
+            <span>Settings</span>
+          </Link>
+        </SidebarNavItem>
+      </SidebarNav>
     </Sidebar>
   );
 }
