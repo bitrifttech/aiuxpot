@@ -15,9 +15,20 @@ import {
 export function DarkModeToggle() {
   const { theme, setTheme } = useTheme();
 
-  React.useEffect(() => {
-    console.log("Current theme:", theme); // Debug log
-  }, [theme]);
+  const handleThemeChange = (newTheme: string) => {
+    setTheme(newTheme);
+    const root = window.document.documentElement;
+    root.classList.remove("light", "dark", "system");
+    
+    if (newTheme === "system") {
+      const systemTheme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+      root.classList.add(systemTheme);
+    } else {
+      root.classList.add(newTheme);
+    }
+    
+    console.log("Theme changed to:", newTheme);
+  };
 
   return (
     <DropdownMenu>
@@ -29,13 +40,13 @@ export function DarkModeToggle() {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={() => setTheme("light")}>
+        <DropdownMenuItem onClick={() => handleThemeChange("light")}>
           Light
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setTheme("dark")}>
+        <DropdownMenuItem onClick={() => handleThemeChange("dark")}>
           Dark
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setTheme("system")}>
+        <DropdownMenuItem onClick={() => handleThemeChange("system")}>
           System
         </DropdownMenuItem>
       </DropdownMenuContent>

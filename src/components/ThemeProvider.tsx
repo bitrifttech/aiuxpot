@@ -11,13 +11,38 @@ interface ThemeProviderProps {
 
 export function ThemeProvider({ children, ...props }: ThemeProviderProps) {
   React.useEffect(() => {
-    // Force a re-render on mount to ensure theme is applied
     const root = window.document.documentElement;
     const initialTheme = localStorage.getItem(props.storageKey || "theme") || props.defaultTheme;
+    
     if (initialTheme) {
-      root.classList.remove("light", "dark");
-      root.classList.add(initialTheme);
+      // Remove any existing theme classes
+      root.classList.remove("light", "dark", "system");
+      
+      // If system theme, detect preferred color scheme
+      if (initialTheme === "system") {
+        const systemTheme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+        root.classList.add(systemTheme);
+      } else {
+        root.classList.add(initialTheme);
+      }
+      
+      // Store the theme
+      localStorage.setItem(props.storageKey || "theme", initialTheme);
+      console.log("Theme initialized:", initialTheme);
     }
+
+    // Listen for system theme changes
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    const handleChange = (e: MediaQueryListEvent) => {
+      if (localStorage.getItem(props.storageKey || "theme") === "system") {
+        root.classList.remove("light", "dark");
+        root.classList.add(e.matches ? "dark" : "light");
+        console.log("System theme changed:", e.matches ? "dark" : "light");
+      }
+    };
+
+    mediaQuery.addEventListener("change", handleChange);
+    return () => mediaQuery.removeEventListener("change", handleChange);
   }, [props.defaultTheme, props.storageKey]);
 
   return <NextThemesProvider {...props}>{children}</NextThemesProvider>;
