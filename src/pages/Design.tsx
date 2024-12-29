@@ -1,3 +1,4 @@
+import { Toaster } from "@/components/ui/toaster";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -9,6 +10,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { EditorToolbar } from "@/components/CodeEditor/EditorToolbar";
 import { MonacoEditor } from "@/components/CodeEditor/MonacoEditor";
 import { Preview } from "@/components/CodeEditor/Preview";
+import { FilePane } from "@/components/CodeEditor/FilePane";
 import { memoryFS } from "@/utils/memoryFileSystem";
 import type { editor } from "monaco-editor";
 
@@ -124,6 +126,11 @@ function App() {
     }
   };
 
+  const handleFileSelect = (content: string) => {
+    setCode(content);
+    console.log('File content loaded into editor');
+  };
+
   return (
     <div className="h-screen flex flex-col">
       <div className="border-b p-4 flex items-center gap-4">
@@ -181,15 +188,22 @@ function App() {
               />
 
               <TabsContent value="editor" className="h-[calc(100%-50px)]">
-                <MonacoEditor
-                  code={code}
-                  showLineNumbers={showLineNumbers}
-                  wordWrap={wordWrap}
-                  onChange={handleCodeChange}
-                  onUndo={handleUndo}
-                  onFormat={handleFormatDocument}
-                  ref={editorRef}
-                />
+                <div className="h-full flex">
+                  <div className="w-64">
+                    <FilePane onFileSelect={handleFileSelect} />
+                  </div>
+                  <div className="flex-1">
+                    <MonacoEditor
+                      code={code}
+                      showLineNumbers={showLineNumbers}
+                      wordWrap={wordWrap}
+                      onChange={handleCodeChange}
+                      onUndo={handleUndo}
+                      onFormat={handleFormatDocument}
+                      ref={editorRef}
+                    />
+                  </div>
+                </div>
               </TabsContent>
 
               <TabsContent value="preview" className="h-[calc(100%-50px)] p-4">
