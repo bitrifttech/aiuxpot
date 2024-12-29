@@ -1,12 +1,13 @@
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Download, Copy, FileCode, Fold, Hash, WrapText } from "lucide-react";
-import Editor from "@monaco-editor/react";
+import { ArrowLeft } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
+import { EditorToolbar } from "@/components/CodeEditor/EditorToolbar";
+import { MonacoEditor } from "@/components/CodeEditor/MonacoEditor";
 
 const Design = () => {
   const location = useLocation();
@@ -21,11 +22,16 @@ function App() {
   );
 }`);
   const [showLineNumbers, setShowLineNumbers] = useState(true);
-  const [wordWrap, setWordWrap] = useState("on");
+  const [wordWrap, setWordWrap] = useState<"on" | "off">("on");
   const { toast } = useToast();
 
+  useEffect(() => {
+    if (!project) {
+      navigate('/');
+    }
+  }, [project, navigate]);
+
   if (!project) {
-    navigate('/');
     return null;
   }
 
@@ -86,9 +92,10 @@ function App() {
   };
 
   const handleFormatDocument = () => {
-    const editor = window.monaco?.editor;
+    const editor = document.querySelector('.monaco-editor')?.getElementsByClassName('monaco-editor')[0];
     if (editor) {
-      editor.getModels()[0]?.getEditorType().trigger('', 'editor.action.formatDocument', {});
+      const formatAction = { id: 'editor.action.formatDocument' };
+      editor.dispatchEvent(new CustomEvent('editorFormat', { detail: formatAction }));
       toast({
         title: "Code formatted",
         description: "Document has been formatted.",
@@ -143,77 +150,22 @@ function App() {
           {/* Code Editor and Preview Panel */}
           <ResizablePanel defaultSize={70}>
             <Tabs defaultValue="editor" className="h-full">
-              <div className="border-b px-4 flex justify-between items-center">
-                <TabsList>
-                  <TabsTrigger value="editor">Code Editor</TabsTrigger>
-                  <TabsTrigger value="preview">Preview</TabsTrigger>
-                </TabsList>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowLineNumbers(!showLineNumbers)}
-                    title="Toggle line numbers"
-                  >
-                    <Hash className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setWordWrap(wordWrap === "on" ? "off" : "on")}
-                    title="Toggle word wrap"
-                  >
-                    <WrapText className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleFormatDocument}
-                    title="Format document"
-                  >
-                    <FileCode className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleCopyCode}
-                    title="Copy code"
-                  >
-                    <Copy className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="gap-2"
-                    onClick={handleDownloadCode}
-                  >
-                    <Download className="h-4 w-4" />
-                    Download Code
-                  </Button>
-                </div>
-              </div>
+              <EditorToolbar
+                showLineNumbers={showLineNumbers}
+                wordWrap={wordWrap}
+                onToggleLineNumbers={() => setShowLineNumbers(!showLineNumbers)}
+                onToggleWordWrap={() => setWordWrap(wordWrap === "on" ? "off" : "on")}
+                onFormatDocument={handleFormatDocument}
+                onCopyCode={handleCopyCode}
+                onDownloadCode={handleDownloadCode}
+              />
 
               <TabsContent value="editor" className="h-[calc(100%-50px)]">
-                <Editor
-                  height="100%"
-                  defaultLanguage="typescript"
-                  defaultValue={code}
-                  theme="vs-dark"
+                <MonacoEditor
+                  code={code}
+                  showLineNumbers={showLineNumbers}
+                  wordWrap={wordWrap}
                   onChange={handleCodeChange}
-                  options={{
-                    minimap: { enabled: false },
-                    fontSize: 14,
-                    wordWrap: wordWrap,
-                    lineNumbers: showLineNumbers ? "on" : "off",
-                    folding: true,
-                    foldingHighlight: true,
-                    foldingStrategy: 'auto',
-                    showFoldingControls: 'always',
-                    automaticLayout: true,
-                    tabSize: 2,
-                    formatOnPaste: true,
-                    formatOnType: true,
-                  }}
                 />
               </TabsContent>
 
