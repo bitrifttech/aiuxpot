@@ -1,5 +1,5 @@
 import Editor from "@monaco-editor/react";
-import { useRef } from "react";
+import { useRef, useEffect } from "react";
 import type { editor } from "monaco-editor";
 
 interface MonacoEditorProps {
@@ -25,21 +25,23 @@ export const MonacoEditor = ({
     editorRef.current = editor;
   };
 
-  // Expose undo method to parent
-  if (onUndo && editorRef.current) {
-    onUndo = () => {
-      console.log('Triggering undo command...');
-      editorRef.current?.trigger('keyboard', 'undo', null);
-    };
-  }
+  useEffect(() => {
+    if (editorRef.current && onUndo) {
+      onUndo = () => {
+        console.log('Executing undo command...');
+        editorRef.current?.trigger('keyboard', 'undo', null);
+      };
+    }
+  }, [editorRef.current, onUndo]);
 
-  // Expose format method to parent
-  if (onFormat && editorRef.current) {
-    onFormat = () => {
-      console.log('Triggering format command...');
-      editorRef.current?.getAction('editor.action.formatDocument')?.run();
-    };
-  }
+  useEffect(() => {
+    if (editorRef.current && onFormat) {
+      onFormat = () => {
+        console.log('Executing format command...');
+        editorRef.current?.getAction('editor.action.formatDocument')?.run();
+      };
+    }
+  }, [editorRef.current, onFormat]);
 
   return (
     <Editor

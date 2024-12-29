@@ -1,7 +1,7 @@
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
@@ -24,13 +24,20 @@ function App() {
   const [showLineNumbers, setShowLineNumbers] = useState(true);
   const [wordWrap, setWordWrap] = useState<"on" | "off">("on");
   const { toast } = useToast();
+  const editorRef = useRef(null);
 
   const handleUndo = () => {
     console.log('Attempting to undo...');
+    if (editorRef.current) {
+      editorRef.current.trigger('keyboard', 'undo', null);
+    }
   };
 
   const handleFormatDocument = () => {
     console.log('Attempting to format document...');
+    if (editorRef.current) {
+      editorRef.current.getAction('editor.action.formatDocument')?.run();
+    }
   };
 
   useEffect(() => {
@@ -163,6 +170,7 @@ function App() {
                   onChange={handleCodeChange}
                   onUndo={handleUndo}
                   onFormat={handleFormatDocument}
+                  ref={editorRef}
                 />
               </TabsContent>
 
