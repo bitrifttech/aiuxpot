@@ -59,7 +59,12 @@ function App() {
       setCode(content);
       console.log('File content loaded into editor:', fileName);
     } else {
-      console.log('No content found for file:', fileName);
+      console.error('No content found for file:', fileName);
+      toast({
+        title: "Error",
+        description: `Could not load content for file: ${fileName}`,
+        variant: "destructive",
+      });
     }
   };
 
