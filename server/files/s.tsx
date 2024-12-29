@@ -1,6 +1,6 @@
-// t.tsx
+// s.tsx
 
-export default function t() {
+export default function s() {
   return (
     <div>
       New Component

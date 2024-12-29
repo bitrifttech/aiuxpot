@@ -1,59 +1,14 @@
-import { useState, useRef, useEffect } from "react";
-import { useToast } from "@/hooks/use-toast";
-import { EditorToolbar } from "./EditorToolbar";
-import { MonacoEditor } from "./MonacoEditor";
-import { Preview } from "./Preview";
-import { FilePane } from "./FilePane";
-import { fileApi } from "@/utils/fileApi";
-import type { editor } from "monaco-editor";
-import { TabsContent } from "@/components/ui/tabs";
+import { useState } from 'react';
+import { Editor } from '@monaco-editor/react';
+import { FilePane } from './FilePane';
+import { PreviewPane } from '../PreviewPane';
+import { useToast } from '@/components/ui/use-toast';
+import { fileApi } from '@/utils/fileApi';
 
 export const EditorContainer = () => {
-  const [currentFileName, setCurrentFileName] = useState<string>('untitled.tsx');
-  const [code, setCode] = useState(`// Welcome to the code editor
-function App() {
-  return (
-    <div>Hello World</div>
-  );
-}`);
-  const [showLineNumbers, setShowLineNumbers] = useState(true);
-  const [wordWrap, setWordWrap] = useState<"on" | "off">("on");
+  const [currentFileName, setCurrentFileName] = useState<string>();
+  const [code, setCode] = useState<string>('');
   const { toast } = useToast();
-  const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
-
-  // Initialize the default file if it doesn't exist
-  useEffect(() => {
-    const initializeDefaultFile = async () => {
-      const content = await fileApi.readFile(currentFileName);
-      if (!content) {
-        await fileApi.writeFile(currentFileName, code);
-        console.log('Initialized default file:', currentFileName);
-      }
-    };
-    initializeDefaultFile();
-  }, []);
-
-  const handleUndo = () => {
-    console.log('Attempting to undo...');
-    if (editorRef.current) {
-      editorRef.current.trigger('keyboard', 'undo', null);
-    }
-  };
-
-  const handleFormatDocument = () => {
-    console.log('Attempting to format document...');
-    if (editorRef.current) {
-      editorRef.current.getAction('editor.action.formatDocument')?.run();
-    }
-  };
-
-  const handleCodeChange = async (value: string | undefined) => {
-    if (value) {
-      setCode(value);
-      await fileApi.writeFile(currentFileName, value);
-      console.log(`Code updated for file: ${currentFileName}`);
-    }
-  };
 
   const handleFileSelect = async (fileName: string) => {
     console.log('File selected:', fileName);
@@ -72,12 +27,26 @@ function App() {
     }
   };
 
+  const handleCodeChange = async (value: string | undefined) => {
+    if (!currentFileName || !value) return;
+    
+    setCode(value);
+    const success = await fileApi.writeFile(currentFileName, value);
+    if (!success) {
+      toast({
+        title: "Error",
+        description: "Failed to save changes",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleDownloadCode = () => {
     const blob = new Blob([code], { type: 'text/plain' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = currentFileName;
+    a.download = currentFileName || 'code.tsx';
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -106,46 +75,60 @@ function App() {
   };
 
   return (
-    <>
-      <EditorToolbar
-        showLineNumbers={showLineNumbers}
-        wordWrap={wordWrap}
-        onToggleLineNumbers={() => setShowLineNumbers(!showLineNumbers)}
-        onToggleWordWrap={() => setWordWrap(wordWrap === "on" ? "off" : "on")}
-        onFormatDocument={handleFormatDocument}
-        onCopyCode={handleCopyCode}
-        onDownloadCode={handleDownloadCode}
-        onUndo={handleUndo}
-        currentFileName={currentFileName}
-      />
-
-      <TabsContent value="editor" className="h-[calc(100%-50px)]">
-        <div className="h-full flex">
-          <div className="w-64">
-            <FilePane 
-              onFileSelect={handleFileSelect}
-              currentFileName={currentFileName}
-            />
-          </div>
-          <div className="flex-1">
-            <MonacoEditor
-              code={code}
-              showLineNumbers={showLineNumbers}
-              wordWrap={wordWrap}
-              onChange={handleCodeChange}
-              onUndo={handleUndo}
-              onFormat={handleFormatDocument}
-              ref={editorRef}
-            />
+    <div className="h-full flex">
+      <div className="w-64 h-full">
+        <FilePane
+          onFileSelect={handleFileSelect}
+          currentFileName={currentFileName}
+        />
+      </div>
+      <div className="flex-1 h-full flex">
+        <div className="flex-1 h-full">
+          <div className="h-full flex flex-col">
+            <div className="p-2 border-b flex items-center justify-between">
+              <h2 className="text-sm font-semibold">
+                {currentFileName || 'No file selected'}
+              </h2>
+              <div className="space-x-2">
+                <button
+                  onClick={handleCopyCode}
+                  className="px-2 py-1 text-xs bg-secondary text-secondary-foreground rounded hover:bg-secondary/90"
+                >
+                  Copy
+                </button>
+                <button
+                  onClick={handleDownloadCode}
+                  className="px-2 py-1 text-xs bg-primary text-primary-foreground rounded hover:bg-primary/90"
+                >
+                  Download
+                </button>
+              </div>
+            </div>
+            <div className="flex-1">
+              <Editor
+                height="100%"
+                defaultLanguage="typescript"
+                language="typescript"
+                theme="vs-dark"
+                value={code}
+                onChange={handleCodeChange}
+                options={{
+                  minimap: { enabled: false },
+                  fontSize: 14,
+                  lineNumbers: 'on',
+                  roundedSelection: false,
+                  scrollBeyondLastLine: false,
+                  readOnly: !currentFileName,
+                  automaticLayout: true,
+                }}
+              />
+            </div>
           </div>
         </div>
-      </TabsContent>
-
-      <TabsContent value="preview" className="h-[calc(100%-50px)] p-4">
-        <div className="h-full rounded-lg border bg-background p-4">
-          <Preview code={code} />
+        <div className="w-1/2 h-full">
+          <PreviewPane currentFileName={currentFileName} />
         </div>
-      </TabsContent>
-    </>
+      </div>
+    </div>
   );
 };
