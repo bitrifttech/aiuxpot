@@ -15,21 +15,6 @@ import {
 export function DarkModeToggle() {
   const { theme, setTheme } = useTheme();
 
-  const handleThemeChange = (newTheme: string) => {
-    setTheme(newTheme);
-    const root = window.document.documentElement;
-    root.classList.remove("light", "dark", "system");
-    
-    if (newTheme === "system") {
-      const systemTheme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-      root.classList.add(systemTheme);
-    } else {
-      root.classList.add(newTheme);
-    }
-    
-    console.log("Theme changed to:", newTheme);
-  };
-
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -40,13 +25,13 @@ export function DarkModeToggle() {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={() => handleThemeChange("light")}>
+        <DropdownMenuItem onClick={() => setTheme("light")}>
           Light
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => handleThemeChange("dark")}>
+        <DropdownMenuItem onClick={() => setTheme("dark")}>
           Dark
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => handleThemeChange("system")}>
+        <DropdownMenuItem onClick={() => setTheme("system")}>
           System
         </DropdownMenuItem>
       </DropdownMenuContent>
