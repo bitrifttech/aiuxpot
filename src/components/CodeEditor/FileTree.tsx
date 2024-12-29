@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ChevronRight, ChevronDown, Folder, File, Plus, Trash2, Search } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
@@ -182,44 +182,30 @@ export const FileTree = ({
   onDeleteItem
 }: FileTreeProps) => {
   const [searchQuery, setSearchQuery] = useState('');
+  const [fileStructure, setFileStructure] = useState<FileTreeItem[]>([]);
+  const { toast } = useToast();
 
-  // This would be replaced with actual file system data
-  const demoData: FileTreeItem = {
-    name: 'project',
-    type: 'directory',
-    path: '/project',
-    children: [
-      {
-        name: 'src',
-        type: 'directory',
-        path: '/project/src',
-        children: [
-          {
-            name: 'main.ts',
-            type: 'file',
-            path: '/project/src/main.ts'
-          },
-          {
-            name: 'components',
-            type: 'directory',
-            path: '/project/src/components',
-            children: [
-              {
-                name: 'App.tsx',
-                type: 'file',
-                path: '/project/src/components/App.tsx'
-              }
-            ]
-          }
-        ]
-      },
-      {
-        name: 'package.json',
-        type: 'file',
-        path: '/project/package.json'
+  useEffect(() => {
+    const fetchFileStructure = async () => {
+      try {
+        const response = await fetch('/api/files');
+        if (!response.ok) {
+          throw new Error('Failed to fetch file structure');
+        }
+        const data = await response.json();
+        setFileStructure(data);
+      } catch (error) {
+        console.error('Error fetching file structure:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load file structure",
+          variant: "destructive",
+        });
       }
-    ]
-  };
+    };
+
+    fetchFileStructure();
+  }, [toast]);
 
   return (
     <div className="h-full flex flex-col">
@@ -236,14 +222,17 @@ export const FileTree = ({
       </div>
       <ScrollArea className="flex-1">
         <div className="p-2">
-          <TreeNode
-            item={demoData}
-            currentFile={currentFile}
-            onFileSelect={onFileSelect}
-            onCreateFile={onCreateFile}
-            onCreateDirectory={onCreateDirectory}
-            onDeleteItem={onDeleteItem}
-          />
+          {fileStructure.map((item) => (
+            <TreeNode
+              key={item.path}
+              item={item}
+              currentFile={currentFile}
+              onFileSelect={onFileSelect}
+              onCreateFile={onCreateFile}
+              onCreateDirectory={onCreateDirectory}
+              onDeleteItem={onDeleteItem}
+            />
+          ))}
         </div>
       </ScrollArea>
     </div>

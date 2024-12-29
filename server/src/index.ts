@@ -63,10 +63,43 @@ async function listFilesRecursively(dir: string, baseDir: string = ''): Promise<
   return files.flat();
 }
 
+// Helper function to get file structure
+async function getFileStructure(dir: string, basePath: string = ''): Promise<any> {
+  const entries = await fs.readdir(dir, { withFileTypes: true });
+  const structure = [];
+
+  for (const entry of entries) {
+    const relativePath = basePath ? `${basePath}/${entry.name}` : entry.name;
+    const fullPath = join(dir, entry.name);
+    
+    if (entry.isDirectory()) {
+      const children = await getFileStructure(fullPath, relativePath);
+      structure.push({
+        name: entry.name,
+        type: 'directory',
+        path: relativePath,
+        children
+      });
+    } else {
+      structure.push({
+        name: entry.name,
+        type: 'file',
+        path: relativePath
+      });
+    }
+  }
+
+  return structure;
+}
+
 // Middleware
 app.use(cors());
 app.use(express.json());
 app.use(express.static(join(__dirname, '..', 'public')));
+
+// Mount routers
+app.use('/api', router);  // Mount the router under /api
+app.use('/preview', previewRouter);
 
 // Root route
 app.get('/', (_req, res) => {
@@ -133,11 +166,82 @@ app.get('/', (_req, res) => {
   res.send(html);
 });
 
-// API Routes
-app.use('/api', router);
+// File System API Routes
+router.get('/files', async (_req, res) => {
+  try {
+    const structure = await getFileStructure(FILES_DIR);
+    res.json(structure);
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      console.error('Error listing files:', error.message);
+      res.status(500).json({ error: 'Failed to list files', details: error.message });
+    } else {
+      res.status(500).json({ error: 'Failed to list files', details: 'Unknown error' });
+    }
+  }
+});
 
-// Preview Routes
-app.use('/preview', previewRouter);
+router.get('/files/:filename(*)', async (req, res) => {
+  try {
+    const filePath = join(FILES_DIR, req.params.filename);
+    const stats = await fs.stat(filePath);
+
+    if (stats.isDirectory()) {
+      const files = await listFilesRecursively(filePath, req.params.filename);
+      res.json({ type: 'directory', files });
+    } else {
+      const content = await fs.readFile(filePath, 'utf-8');
+      res.json({ type: 'file', content });
+    }
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      console.error('Error reading file/directory:', error.message);
+      res.status(500).json({ error: 'Failed to read file/directory', details: error.message });
+    } else {
+      res.status(500).json({ error: 'Failed to read file/directory', details: 'Unknown error' });
+    }
+  }
+});
+
+router.put('/files/:filename(*)', async (req, res) => {
+  try {
+    const filePath = join(FILES_DIR, req.params.filename);
+    await fs.mkdir(dirname(filePath), { recursive: true });
+    await fs.writeFile(filePath, req.body.content);
+    console.log('File written successfully:', req.params.filename);
+    res.json({ success: true });
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      console.error('Error writing file:', error.message);
+      res.status(500).json({ error: 'Failed to write file', details: error.message });
+    } else {
+      res.status(500).json({ error: 'Failed to write file', details: 'Unknown error' });
+    }
+  }
+});
+
+router.delete('/files/:filename(*)', async (req, res) => {
+  try {
+    const filePath = join(FILES_DIR, req.params.filename);
+    const stats = await fs.stat(filePath);
+
+    if (stats.isDirectory()) {
+      await fs.rm(filePath, { recursive: true });
+      console.log('Directory deleted successfully:', req.params.filename);
+    } else {
+      await fs.unlink(filePath);
+      console.log('File deleted successfully:', req.params.filename);
+    }
+    res.json({ success: true });
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      console.error('Error deleting file/directory:', error.message);
+      res.status(500).json({ error: 'Failed to delete file/directory', details: error.message });
+    } else {
+      res.status(500).json({ error: 'Failed to delete file/directory', details: 'Unknown error' });
+    }
+  }
+});
 
 // Initialize new project from template
 router.post('/init', async (_req, res) => {
@@ -161,81 +265,6 @@ router.post('/init', async (_req, res) => {
       res.status(500).json({ error: 'Failed to initialize project', details: error.message });
     } else {
       res.status(500).json({ error: 'Failed to initialize project', details: 'Unknown error' });
-    }
-  }
-});
-
-// List all files
-router.get('/files', async (_req, res) => {
-  try {
-    const files = await listFilesRecursively(FILES_DIR);
-    console.log('Files listed successfully:', files);
-    res.json(files);
-  } catch (error: unknown) {
-    if (error instanceof Error) {
-      console.error('Error listing files:', error.message);
-      res.status(500).json({ error: 'Failed to list files', details: error.message });
-    } else {
-      res.status(500).json({ error: 'Failed to list files', details: 'Unknown error' });
-    }
-  }
-});
-
-// Read file content
-router.get('/files/:filename', async (req, res) => {
-  try {
-    const filePath = join(FILES_DIR, req.params.filename);
-    const stats = await fs.stat(filePath);
-    
-    if (stats.isDirectory()) {
-      const files = await fs.readdir(filePath);
-      console.log('Directory read successfully:', req.params.filename);
-      res.json({ type: 'directory', files });
-    } else {
-      const content = await fs.readFile(filePath, 'utf-8');
-      console.log('File read successfully:', req.params.filename);
-      res.json({ type: 'file', content });
-    }
-  } catch (error: unknown) {
-    if (error instanceof Error) {
-      console.error('Error reading file/directory:', error.message);
-      res.status(500).json({ error: 'Failed to read file/directory', details: error.message });
-    } else {
-      res.status(500).json({ error: 'Failed to read file/directory', details: 'Unknown error' });
-    }
-  }
-});
-
-// Create/Update file
-router.put('/files/:filename', async (req, res) => {
-  try {
-    const filePath = join(FILES_DIR, req.params.filename);
-    await fs.mkdir(dirname(filePath), { recursive: true });
-    await fs.writeFile(filePath, req.body.content);
-    console.log('File written successfully:', req.params.filename);
-    res.json({ success: true });
-  } catch (error: unknown) {
-    if (error instanceof Error) {
-      console.error('Error writing file:', error.message);
-      res.status(500).json({ error: 'Failed to write file', details: error.message });
-    } else {
-      res.status(500).json({ error: 'Failed to write file', details: 'Unknown error' });
-    }
-  }
-});
-
-// Delete file
-router.delete('/files/:filename', async (req, res) => {
-  try {
-    await fs.unlink(join(FILES_DIR, req.params.filename));
-    console.log('File deleted successfully:', req.params.filename);
-    res.json({ success: true });
-  } catch (error: unknown) {
-    if (error instanceof Error) {
-      console.error('Error deleting file:', error.message);
-      res.status(500).json({ error: 'Failed to delete file', details: error.message });
-    } else {
-      res.status(500).json({ error: 'Failed to delete file', details: 'Unknown error' });
     }
   }
 });
