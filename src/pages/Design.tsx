@@ -4,7 +4,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Download } from "lucide-react";
+import { ArrowLeft, Download, Copy, FileCode, Fold, Hash, WrapText } from "lucide-react";
 import Editor from "@monaco-editor/react";
 import { useToast } from "@/components/ui/use-toast";
 
@@ -20,6 +20,8 @@ function App() {
     <div>Hello World</div>
   );
 }`);
+  const [showLineNumbers, setShowLineNumbers] = useState(true);
+  const [wordWrap, setWordWrap] = useState("on");
   const { toast } = useToast();
 
   if (!project) {
@@ -65,6 +67,33 @@ function App() {
       title: "Code downloaded",
       description: "Your code has been downloaded successfully.",
     });
+  };
+
+  const handleCopyCode = async () => {
+    try {
+      await navigator.clipboard.writeText(code);
+      toast({
+        title: "Code copied",
+        description: "Code has been copied to clipboard.",
+      });
+    } catch (err) {
+      toast({
+        title: "Failed to copy",
+        description: "Could not copy code to clipboard.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleFormatDocument = () => {
+    const editor = window.monaco?.editor;
+    if (editor) {
+      editor.getModels()[0]?.getEditorType().trigger('', 'editor.action.formatDocument', {});
+      toast({
+        title: "Code formatted",
+        description: "Document has been formatted.",
+      });
+    }
   };
 
   return (
@@ -119,15 +148,49 @@ function App() {
                   <TabsTrigger value="editor">Code Editor</TabsTrigger>
                   <TabsTrigger value="preview">Preview</TabsTrigger>
                 </TabsList>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-2"
-                  onClick={handleDownloadCode}
-                >
-                  <Download className="h-4 w-4" />
-                  Download Code
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowLineNumbers(!showLineNumbers)}
+                    title="Toggle line numbers"
+                  >
+                    <Hash className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setWordWrap(wordWrap === "on" ? "off" : "on")}
+                    title="Toggle word wrap"
+                  >
+                    <WrapText className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleFormatDocument}
+                    title="Format document"
+                  >
+                    <FileCode className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleCopyCode}
+                    title="Copy code"
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    onClick={handleDownloadCode}
+                  >
+                    <Download className="h-4 w-4" />
+                    Download Code
+                  </Button>
+                </div>
               </div>
 
               <TabsContent value="editor" className="h-[calc(100%-50px)]">
@@ -140,7 +203,12 @@ function App() {
                   options={{
                     minimap: { enabled: false },
                     fontSize: 14,
-                    wordWrap: "on",
+                    wordWrap: wordWrap,
+                    lineNumbers: showLineNumbers ? "on" : "off",
+                    folding: true,
+                    foldingHighlight: true,
+                    foldingStrategy: 'auto',
+                    showFoldingControls: 'always',
                     automaticLayout: true,
                     tabSize: 2,
                     formatOnPaste: true,
