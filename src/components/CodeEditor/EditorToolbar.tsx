@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { Download, Copy, FileCode, ChevronDown, Hash, WrapText } from "lucide-react";
+import { Download, Copy, FileCode, ChevronDown, Hash, WrapText, Undo } from "lucide-react";
 import { TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface EditorToolbarProps {
@@ -10,6 +10,7 @@ interface EditorToolbarProps {
   onFormatDocument: () => void;
   onCopyCode: () => void;
   onDownloadCode: () => void;
+  onUndo: () => void;
 }
 
 export const EditorToolbar = ({
@@ -20,6 +21,7 @@ export const EditorToolbar = ({
   onFormatDocument,
   onCopyCode,
   onDownloadCode,
+  onUndo,
 }: EditorToolbarProps) => {
   return (
     <div className="border-b px-4 flex justify-between items-center">
@@ -28,6 +30,14 @@ export const EditorToolbar = ({
         <TabsTrigger value="preview">Preview</TabsTrigger>
       </TabsList>
       <div className="flex items-center gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onUndo}
+          title="Undo"
+        >
+          <Undo className="h-4 w-4" />
+        </Button>
         <Button
           variant="outline"
           size="sm"

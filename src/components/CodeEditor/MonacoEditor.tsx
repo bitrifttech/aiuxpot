@@ -7,6 +7,7 @@ interface MonacoEditorProps {
   showLineNumbers: boolean;
   wordWrap: "on" | "off";
   onChange: (value: string | undefined) => void;
+  onUndo?: () => void;
 }
 
 export const MonacoEditor = ({
@@ -14,11 +15,17 @@ export const MonacoEditor = ({
   showLineNumbers,
   wordWrap,
   onChange,
+  onUndo,
 }: MonacoEditorProps) => {
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
 
   const handleEditorDidMount = (editor: editor.IStandaloneCodeEditor) => {
     editorRef.current = editor;
+    if (onUndo) {
+      onUndo = () => {
+        editor.trigger('keyboard', 'undo', null);
+      };
+    }
   };
 
   return (

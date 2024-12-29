@@ -25,6 +25,11 @@ function App() {
   const [wordWrap, setWordWrap] = useState<"on" | "off">("on");
   const { toast } = useToast();
 
+  const handleUndo = () => {
+    console.log('Attempting to undo...');
+    // The actual undo functionality is handled by the Monaco editor instance
+  };
+
   useEffect(() => {
     if (!project) {
       navigate('/');
@@ -114,7 +119,6 @@ function App() {
       
       <div className="flex-1">
         <ResizablePanelGroup direction="horizontal">
-          {/* Chat Panel */}
           <ResizablePanel defaultSize={30} minSize={20}>
             <div className="h-full flex flex-col bg-sidebar p-4">
               <ScrollArea className="flex-1 pr-4">
@@ -158,6 +162,7 @@ function App() {
                 onFormatDocument={handleFormatDocument}
                 onCopyCode={handleCopyCode}
                 onDownloadCode={handleDownloadCode}
+                onUndo={handleUndo}
               />
 
               <TabsContent value="editor" className="h-[calc(100%-50px)]">
@@ -166,6 +171,7 @@ function App() {
                   showLineNumbers={showLineNumbers}
                   wordWrap={wordWrap}
                   onChange={handleCodeChange}
+                  onUndo={handleUndo}
                 />
               </TabsContent>
 
