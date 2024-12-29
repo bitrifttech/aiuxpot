@@ -25,7 +25,23 @@ export const MonacoEditor = forwardRef<editor.IStandaloneCodeEditor, MonacoEdito
     } else if (ref) {
       ref.current = editor;
     }
+    
+    // Set initial value
+    editor.setValue(code);
+    console.log('Editor mounted with initial code:', code);
   };
+
+  // Update editor value when code prop changes
+  useEffect(() => {
+    console.log('Code prop updated:', code);
+    if (ref && typeof ref !== 'function' && ref.current) {
+      const currentValue = ref.current.getValue();
+      if (currentValue !== code) {
+        console.log('Updating editor value to:', code);
+        ref.current.setValue(code);
+      }
+    }
+  }, [code, ref]);
 
   useEffect(() => {
     if (ref && onUndo) {
@@ -57,7 +73,7 @@ export const MonacoEditor = forwardRef<editor.IStandaloneCodeEditor, MonacoEdito
     <Editor
       height="100%"
       defaultLanguage="typescript"
-      defaultValue={code}
+      value={code}
       theme="vs-dark"
       onChange={onChange}
       onMount={handleEditorDidMount}
