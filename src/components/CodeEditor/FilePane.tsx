@@ -1,26 +1,17 @@
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import { File, FolderOpen, Plus, Trash2, ChevronRight, ChevronDown } from "lucide-react";
+import { Plus } from "lucide-react";
 import { memoryFS } from "@/utils/memoryFileSystem";
 import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
+import { FileTreeNode } from "./FileTree/FileTreeNode";
+import { buildFileTree } from "./FileTree/utils";
 
 interface FilePaneProps {
   onFileSelect: (fileName: string) => void;
   currentFileName?: string;
-}
-
-interface FileTreeNode {
-  name: string;
-  path: string;
-  type: 'file' | 'directory';
-  children?: FileTreeNode[];
-}
-
-interface FileTreeStructure {
-  [key: string]: FileTreeNode;
 }
 
 export const FilePane = ({ onFileSelect, currentFileName }: FilePaneProps) => {
@@ -30,28 +21,29 @@ export const FilePane = ({ onFileSelect, currentFileName }: FilePaneProps) => {
   const [newFileName, setNewFileName] = useState("");
   const { toast } = useToast();
 
+  // Initialize files list and select first file if none selected
   useEffect(() => {
     const updateFiles = () => {
       const filesList = memoryFS.listFiles();
+      console.log('Initializing files list:', filesList);
       setFiles(filesList);
-      console.log('Files list updated:', filesList);
       
       // If we have files and no current file is selected, select the first one
       if (filesList.length > 0 && !currentFileName) {
-        console.log('Selecting initial file:', filesList[0]);
-        onFileSelect(filesList[0]);
+        const firstFile = filesList[0];
+        console.log('Auto-selecting initial file:', firstFile);
+        onFileSelect(firstFile);
       }
     };
 
+    // Initial load
     updateFiles();
-  }, [currentFileName, onFileSelect]);
 
-  const handleFileClick = (fileName: string) => {
-    // Remove leading slash if present
-    const normalizedPath = fileName.startsWith('/') ? fileName.slice(1) : fileName;
-    console.log('Handling file click with normalized path:', normalizedPath);
-    onFileSelect(normalizedPath);
-  };
+    // Set up an interval to check for new files
+    const interval = setInterval(updateFiles, 1000);
+
+    return () => clearInterval(interval);
+  }, [currentFileName, onFileSelect]);
 
   const handleDeleteFile = (path: string) => {
     const normalizedPath = path.startsWith('/') ? path.slice(1) : path;
@@ -70,9 +62,7 @@ export const FilePane = ({ onFileSelect, currentFileName }: FilePaneProps) => {
       return;
     }
 
-    // Add .tsx extension if not provided
     const fileName = newFileName.endsWith('.tsx') ? newFileName : `${newFileName}.tsx`;
-    // Remove any leading slash
     const normalizedFileName = fileName.startsWith('/') ? fileName.slice(1) : fileName;
 
     if (memoryFS.readFile(normalizedFileName)) {
@@ -84,7 +74,11 @@ export const FilePane = ({ onFileSelect, currentFileName }: FilePaneProps) => {
       return;
     }
 
-    memoryFS.writeFile(normalizedFileName, `// ${normalizedFileName}\n\nexport default function ${newFileName.split('.')[0]}() {\n  return (\n    <div>\n      New Component\n    </div>\n  );\n}`);
+    memoryFS.writeFile(
+      normalizedFileName,
+      `// ${normalizedFileName}\n\nexport default function ${newFileName.split('.')[0]}() {\n  return (\n    <div>\n      New Component\n    </div>\n  );\n}`
+    );
+    
     setFiles(memoryFS.listFiles());
     setNewFileName("");
     setIsNewFileDialogOpen(false);
@@ -106,97 +100,6 @@ export const FilePane = ({ onFileSelect, currentFileName }: FilePaneProps) => {
       }
       return next;
     });
-  };
-
-  const buildFileTree = (files: string[]): FileTreeNode[] => {
-    const root: FileTreeStructure = {};
-
-    files.forEach(filePath => {
-      const parts = filePath.split('/').filter(Boolean);
-      let currentLevel = root;
-      let currentPath = '';
-
-      parts.forEach((part, index) => {
-        currentPath += '/' + part;
-        if (!currentLevel[currentPath]) {
-          currentLevel[currentPath] = {
-            name: part,
-            path: currentPath,
-            type: index === parts.length - 1 ? 'file' : 'directory',
-            children: index === parts.length - 1 ? undefined : []
-          };
-        }
-        if (index !== parts.length - 1) {
-          // Ensure children is initialized as an array
-          if (!currentLevel[currentPath].children) {
-            currentLevel[currentPath].children = [];
-          }
-          // Find the next level in the children array
-          const nextLevel: FileTreeStructure = {};
-          currentLevel = nextLevel;
-        }
-      });
-    });
-
-    // Convert the tree structure to array format
-    return Object.values(root).map(node => ({
-      ...node,
-      children: node.children || undefined
-    }));
-  };
-
-  const renderFileTree = (nodes: FileTreeNode[], level: number = 0) => {
-    return nodes.map((node) => (
-      <div key={node.path} style={{ paddingLeft: `${level * 12}px` }}>
-        {node.type === 'directory' ? (
-          <div className="group flex items-center">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="w-full justify-start gap-2 px-2"
-              onClick={() => toggleFolder(node.path)}
-            >
-              {expandedFolders.has(node.path) ? (
-                <ChevronDown className="h-4 w-4" />
-              ) : (
-                <ChevronRight className="h-4 w-4" />
-              )}
-              <FolderOpen className="h-4 w-4" />
-              <span className="truncate">{node.name}</span>
-            </Button>
-          </div>
-        ) : (
-          <div
-            className={`group flex items-center justify-between p-2 rounded-md hover:bg-accent text-sm ${
-              currentFileName === node.path ? 'bg-accent' : ''
-            }`}
-          >
-            <Button
-              variant="ghost"
-              size="sm"
-              className="w-full justify-start gap-2 px-2"
-              onClick={() => handleFileClick(node.path)}
-            >
-              <File className="h-4 w-4" />
-              <span className="truncate">{node.name}</span>
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 opacity-0 group-hover:opacity-100"
-              onClick={() => handleDeleteFile(node.path)}
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          </div>
-        )}
-        {node.type === 'directory' && expandedFolders.has(node.path) && node.children && (
-          <div className="pl-2">
-            {renderFileTree(node.children, level + 1)}
-          </div>
-        )}
-      </div>
-    ));
   };
 
   const fileTree = buildFileTree(files);
@@ -238,7 +141,18 @@ export const FilePane = ({ onFileSelect, currentFileName }: FilePaneProps) => {
       </div>
       <ScrollArea className="h-[calc(100%-40px)]">
         <div className="p-2 space-y-1">
-          {renderFileTree(fileTree)}
+          {fileTree.map((node) => (
+            <FileTreeNode
+              key={node.path}
+              node={node}
+              level={0}
+              currentFileName={currentFileName}
+              expandedFolders={expandedFolders}
+              onFileSelect={onFileSelect}
+              onDeleteFile={handleDeleteFile}
+              onToggleFolder={toggleFolder}
+            />
+          ))}
         </div>
       </ScrollArea>
     </div>
