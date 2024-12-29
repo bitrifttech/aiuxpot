@@ -11,6 +11,7 @@ export const fileApi = {
         throw new Error(errorData.details || 'Failed to list files');
       }
       
+      // Store the parsed response to avoid reading the stream multiple times
       const files = await response.json();
       console.log('Files listed successfully:', files);
       return files;
@@ -18,7 +19,7 @@ export const fileApi = {
       console.error('Error listing files:', error);
       toast({
         title: "Error",
-        description: error.message || "Failed to list files",
+        description: "Failed to list files",
         variant: "destructive",
       });
       return [];
