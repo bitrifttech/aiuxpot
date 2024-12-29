@@ -206,18 +206,6 @@ describe('Example Test', () => {
     const activePane = panes.find(p => p.id === activePaneId);
     if (!activePane) return;
 
-    // If file is already open in the active pane, just switch to it
-    if (activePane.tabs.some(tab => tab.path === path)) {
-      setPanes(currentPanes =>
-        currentPanes.map(pane =>
-          pane.id === activePaneId
-            ? { ...pane, activeTab: path }
-            : pane
-        )
-      );
-      return;
-    }
-
     try {
       setIsLoading(true);
       const content = await fileApi.readFile(path);
@@ -232,15 +220,34 @@ describe('Example Test', () => {
       }
 
       setPanes(currentPanes =>
-        currentPanes.map(pane =>
-          pane.id === activePaneId
-            ? {
-                ...pane,
-                tabs: [...pane.tabs, { path, content, isDirty: false }],
-                activeTab: path
-              }
-            : pane
-        )
+        currentPanes.map(pane => {
+          if (pane.id !== activePaneId) return pane;
+
+          // Check if file is already open in this pane
+          const existingTabIndex = pane.tabs.findIndex(tab => tab.path === path);
+          
+          if (existingTabIndex !== -1) {
+            // Update existing tab's content
+            const updatedTabs = [...pane.tabs];
+            updatedTabs[existingTabIndex] = {
+              ...updatedTabs[existingTabIndex],
+              content,
+              isDirty: false
+            };
+            return {
+              ...pane,
+              tabs: updatedTabs,
+              activeTab: path
+            };
+          }
+
+          // Add new tab
+          return {
+            ...pane,
+            tabs: [...pane.tabs, { path, content, isDirty: false }],
+            activeTab: path
+          };
+        })
       );
     } catch (error) {
       console.error('Error loading file:', error);
