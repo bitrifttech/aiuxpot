@@ -1,25 +1,26 @@
-import { Toaster } from "@/components/ui/toaster";
-import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
-import { Tabs } from "@/components/ui/tabs";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { useState, useEffect } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
+import { useProject } from "@/contexts/ProjectContext";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
+import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { useState, lazy, Suspense } from "react";
 import { EditorContainer } from "@/components/CodeEditor/EditorContainer";
 
 const Design = () => {
-  const location = useLocation();
+  const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
-  const project = location.state?.project;
+  const { projects } = useProject();
+  const project = projects.find(p => p.id === projectId);
   const [messages, setMessages] = useState<Array<{ role: 'user' | 'assistant', content: string }>>([]);
   const [input, setInput] = useState("");
+  const [code, setCode] = useState(`// Welcome to the editor
+// Start typing your code here...
 
-  useEffect(() => {
-    if (!project) {
-      navigate('/');
-    }
-  }, [project, navigate]);
+function greet(name: string) {
+  return \`Hello, \${name}!\`;
+}
+`);
 
   if (!project) {
     return null;
@@ -32,7 +33,6 @@ const Design = () => {
     setMessages(prev => [...prev, { role: 'user', content: input }]);
     setInput("");
     
-    // Simulate AI response
     setTimeout(() => {
       setMessages(prev => [...prev, { 
         role: 'assistant', 
@@ -85,9 +85,7 @@ const Design = () => {
           <ResizableHandle withHandle />
 
           <ResizablePanel defaultSize={70}>
-            <Tabs defaultValue="editor" className="h-full">
-              <EditorContainer />
-            </Tabs>
+            <EditorContainer code={code} onChange={value => value && setCode(value)} />
           </ResizablePanel>
         </ResizablePanelGroup>
       </div>

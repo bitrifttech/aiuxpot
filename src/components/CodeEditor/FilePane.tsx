@@ -20,42 +20,47 @@ export const FilePane = ({ onFileSelect, currentFileName }: FilePaneProps) => {
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(['/']));
   const [isNewFileDialogOpen, setIsNewFileDialogOpen] = useState(false);
   const [newFileName, setNewFileName] = useState("");
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
   const { toast } = useToast();
 
   const updateFiles = async () => {
-    const filesList = await fileApi.listFiles();
-    console.log('Files list updated:', filesList);
-    setFiles(filesList);
-    
-    if (filesList.length > 0 && !currentFileName) {
-      // Find the first file (not directory) to select
-      const fileTree = buildFileTree(filesList);
-      const findFirstFile = (nodes: FileTreeNodeType[]): string | undefined => {
-        for (const node of nodes) {
-          if (node.type === 'file') {
-            return node.path;
-          }
-          if (node.children?.length) {
-            const found = findFirstFile(node.children);
-            if (found) return found;
-          }
-        }
-        return undefined;
-      };
+    try {
+      const filesList = await fileApi.listFiles();
+      console.log('Files list updated:', filesList);
+      setFiles(filesList);
       
-      const firstFile = findFirstFile(fileTree);
-      if (firstFile) {
-        console.log('Auto-selecting initial file:', firstFile);
-        onFileSelect(firstFile);
+      if (filesList.length > 0 && !currentFileName && isInitialLoad) {
+        const fileTree = buildFileTree(filesList);
+        const findFirstFile = (nodes: FileTreeNodeType[]): string | undefined => {
+          for (const node of nodes) {
+            if (node.type === 'file') {
+              return node.path;
+            }
+            if (node.children?.length) {
+              const found = findFirstFile(node.children);
+              if (found) return found;
+            }
+          }
+          return undefined;
+        };
+        
+        const firstFile = findFirstFile(fileTree);
+        if (firstFile) {
+          console.log('Auto-selecting initial file:', firstFile);
+          onFileSelect(firstFile);
+        }
+        setIsInitialLoad(false);
       }
+    } catch (error) {
+      console.error('Error updating files:', error);
     }
   };
 
   useEffect(() => {
     updateFiles();
-    const interval = setInterval(updateFiles, 1000);
+    const interval = setInterval(updateFiles, 5000);
     return () => clearInterval(interval);
-  }, [currentFileName, onFileSelect]);
+  }, [currentFileName, onFileSelect, isInitialLoad]);
 
   const handleDeleteFile = async (path: string) => {
     const normalizedPath = path.startsWith('/') ? path.slice(1) : path;

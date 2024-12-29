@@ -4,26 +4,31 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { ProjectProvider } from "@/contexts/ProjectContext";
 import Index from "./pages/Index";
 import Design from "./pages/Design";
+import TestDesign from "./pages/TestDesign";
 
 const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider defaultTheme="system" storageKey="vite-ui-theme">
-      <TooltipProvider>
-        <div className="min-h-screen bg-background text-foreground">
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
-            <Routes>
-              <Route path="/" element={<Index />} />
-              <Route path="/design" element={<Design />} />
-            </Routes>
-          </BrowserRouter>
-        </div>
-      </TooltipProvider>
+      <ProjectProvider>
+        <TooltipProvider>
+          <div className="min-h-screen bg-background text-foreground">
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
+              <Routes>
+                <Route path="/" element={<Index />} />
+                <Route path="/design/:projectId" element={<Design />} />
+                <Route path="/test-design/:projectId" element={<TestDesign />} />
+              </Routes>
+            </BrowserRouter>
+          </div>
+        </TooltipProvider>
+      </ProjectProvider>
     </ThemeProvider>
   </QueryClientProvider>
 );

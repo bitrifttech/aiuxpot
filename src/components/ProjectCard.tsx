@@ -24,7 +24,7 @@ export function ProjectCard({ project, onDelete }: ProjectCardProps) {
   };
 
   const handleClick = () => {
-    navigate(`/design?projectId=${project.id}`, { state: { project } });
+    navigate(`/design/${project.id}`);
   };
 
   return (
@@ -35,9 +35,17 @@ export function ProjectCard({ project, onDelete }: ProjectCardProps) {
       <CardHeader>
         <CardTitle className="flex justify-between items-center">
           <span>{project.title}</span>
-          <Button variant="ghost" size="icon" onClick={handleDelete}>
-            <Trash className="h-4 w-4 text-destructive" />
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="ghost" size="icon" onClick={(e) => {
+              e.stopPropagation();
+              navigate(`/test-design/${project.id}`);
+            }}>
+              <span className="text-xs">Test</span>
+            </Button>
+            <Button variant="ghost" size="icon" onClick={handleDelete}>
+              <Trash className="h-4 w-4 text-destructive" />
+            </Button>
+          </div>
         </CardTitle>
       </CardHeader>
       <CardContent>

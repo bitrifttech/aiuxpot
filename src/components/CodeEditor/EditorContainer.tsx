@@ -1,140 +1,227 @@
-import { useState } from 'react';
-import { Editor } from '@monaco-editor/react';
-import { FilePane } from './FilePane';
-import { PreviewPane } from '../PreviewPane';
+import { useState, lazy, Suspense, useCallback, useEffect, useRef } from 'react';
+import { FileTree } from './FileTree';
+import { TabsManager } from './TabsManager';
 import { useToast } from '@/components/ui/use-toast';
 import { fileApi } from '@/utils/fileApi';
+import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
+import debounce from 'lodash/debounce';
+import type { editor } from 'monaco-editor';
+
+const MonacoEditor = lazy(() => import("./MonacoEditor").then(module => ({
+  default: module.MonacoEditor
+})));
+
+const LoadingSpinner = () => (
+  <div className="h-full flex items-center justify-center">
+    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+  </div>
+);
+
+interface OpenTab {
+  path: string;
+  content: string;
+  isDirty: boolean;
+}
 
 export const EditorContainer = () => {
-  const [currentFileName, setCurrentFileName] = useState<string>();
-  const [code, setCode] = useState<string>('');
+  const [openTabs, setOpenTabs] = useState<OpenTab[]>([]);
+  const [activeTab, setActiveTab] = useState<string>();
+  const [isLoading, setIsLoading] = useState(false);
+  const editorRef = useRef<editor.IStandaloneCodeEditor>();
   const { toast } = useToast();
 
-  const handleFileSelect = async (fileName: string) => {
-    console.log('File selected:', fileName);
-    const content = await fileApi.readFile(fileName);
-    
-    // If content is null, it might be a directory
-    if (content === null) {
-      // Don't clear the editor state for directories
+  // Auto-save debounced function
+  const debouncedSave = useCallback(
+    debounce(async (path: string, content: string) => {
+      try {
+        await fileApi.writeFile(path, content);
+        setOpenTabs(tabs =>
+          tabs.map(tab =>
+            tab.path === path ? { ...tab, isDirty: false } : tab
+          )
+        );
+        toast({
+          title: "Saved",
+          description: `File ${path.split('/').pop()} saved successfully`,
+        });
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: "Failed to save file",
+          variant: "destructive",
+        });
+      }
+    }, 1000),
+    []
+  );
+
+  // Handle keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+        e.preventDefault();
+        if (activeTab) {
+          const tab = openTabs.find(t => t.path === activeTab);
+          if (tab) {
+            debouncedSave(tab.path, tab.content);
+          }
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [activeTab, openTabs, debouncedSave]);
+
+  const handleFileSelect = async (path: string) => {
+    // If file is already open, just switch to it
+    if (openTabs.some(tab => tab.path === path)) {
+      setActiveTab(path);
       return;
     }
 
-    setCurrentFileName(fileName);
-    setCode(content);
-    console.log('File content loaded into editor:', fileName);
-  };
+    try {
+      setIsLoading(true);
+      const content = await fileApi.readFile(path);
+      
+      if (content === null) {
+        toast({
+          title: "Error",
+          description: "Could not read file content",
+          variant: "destructive",
+        });
+        return;
+      }
 
-  const handleCodeChange = async (value: string | undefined) => {
-    if (!currentFileName || !value) return;
-    
-    setCode(value);
-    const success = await fileApi.writeFile(currentFileName, value);
-    if (!success) {
+      setOpenTabs(tabs => [...tabs, { path, content, isDirty: false }]);
+      setActiveTab(path);
+    } catch (error) {
+      console.error('Error loading file:', error);
       toast({
         title: "Error",
-        description: "Failed to save changes",
+        description: "Failed to load file",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleTabClose = (path: string) => {
+    const tab = openTabs.find(t => t.path === path);
+    if (tab?.isDirty) {
+      // TODO: Show confirmation dialog
+      debouncedSave(path, tab.content);
+    }
+    setOpenTabs(tabs => tabs.filter(t => t.path !== path));
+    if (activeTab === path) {
+      setActiveTab(openTabs[openTabs.length - 2]?.path);
+    }
+  };
+
+  const handleCodeChange = (value: string | undefined) => {
+    if (!activeTab || !value) return;
+    
+    setOpenTabs(tabs =>
+      tabs.map(tab =>
+        tab.path === activeTab
+          ? { ...tab, content: value, isDirty: true }
+          : tab
+      )
+    );
+    
+    // Trigger auto-save
+    debouncedSave(activeTab, value);
+  };
+
+  const handleCreateFile = async (path: string) => {
+    try {
+      await fileApi.writeFile(path, '');
+      handleFileSelect(path);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to create file",
         variant: "destructive",
       });
     }
   };
 
-  const handleDownloadCode = () => {
-    const blob = new Blob([code], { type: 'text/plain' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = currentFileName || 'code.tsx';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
-    
+  const handleCreateDirectory = async (path: string) => {
+    // TODO: Implement directory creation in fileApi
     toast({
-      title: "Code downloaded",
-      description: `Your code has been downloaded as ${currentFileName}`,
+      title: "Success",
+      description: "Directory created",
     });
   };
 
-  const handleCopyCode = async () => {
+  const handleDeleteItem = async (path: string) => {
     try {
-      await navigator.clipboard.writeText(code);
+      await fileApi.deleteFile(path);
+      handleTabClose(path);
       toast({
-        title: "Code copied",
-        description: "Code has been copied to clipboard.",
+        title: "Success",
+        description: "Item deleted successfully",
       });
-    } catch (err) {
+    } catch (error) {
       toast({
-        title: "Failed to copy",
-        description: "Could not copy code to clipboard.",
+        title: "Error",
+        description: "Failed to delete item",
         variant: "destructive",
       });
     }
   };
 
+  const activeContent = openTabs.find(tab => tab.path === activeTab)?.content || '';
+
   return (
     <div className="h-full flex">
-      <div className="w-64 h-full">
-        <FilePane
-          onFileSelect={handleFileSelect}
-          currentFileName={currentFileName}
-        />
-      </div>
-      <div className="flex-1 h-full flex">
-        <div className="flex-1 h-full">
+      <ResizablePanelGroup direction="horizontal">
+        <ResizablePanel defaultSize={20} minSize={15}>
+          <FileTree
+            currentFile={activeTab}
+            onFileSelect={handleFileSelect}
+            onCreateFile={handleCreateFile}
+            onCreateDirectory={handleCreateDirectory}
+            onDeleteItem={handleDeleteItem}
+          />
+        </ResizablePanel>
+
+        <ResizableHandle withHandle />
+
+        <ResizablePanel defaultSize={80}>
           <div className="h-full flex flex-col">
-            <div className="p-2 border-b flex items-center justify-between">
-              <h2 className="text-sm font-semibold">
-                {currentFileName || 'No file selected'}
-              </h2>
-              {currentFileName && (
-                <div className="space-x-2">
-                  <button
-                    onClick={handleCopyCode}
-                    className="px-2 py-1 text-xs bg-secondary text-secondary-foreground rounded hover:bg-secondary/90"
-                  >
-                    Copy
-                  </button>
-                  <button
-                    onClick={handleDownloadCode}
-                    className="px-2 py-1 text-xs bg-primary text-primary-foreground rounded hover:bg-primary/90"
-                  >
-                    Download
-                  </button>
-                </div>
-              )}
-            </div>
+            <TabsManager
+              tabs={openTabs.map(tab => ({
+                path: tab.path,
+                isDirty: tab.isDirty
+              }))}
+              activeTab={activeTab}
+              onTabSelect={setActiveTab}
+              onTabClose={handleTabClose}
+            />
+            
             <div className="flex-1">
-              {currentFileName ? (
-                <Editor
-                  height="100%"
-                  defaultLanguage="typescript"
-                  language="typescript"
-                  theme="vs-dark"
-                  value={code}
-                  onChange={handleCodeChange}
-                  options={{
-                    minimap: { enabled: false },
-                    fontSize: 14,
-                    lineNumbers: 'on',
-                    roundedSelection: false,
-                    scrollBeyondLastLine: false,
-                    readOnly: false,
-                    automaticLayout: true,
-                  }}
-                />
+              {isLoading ? (
+                <LoadingSpinner />
+              ) : activeTab ? (
+                <Suspense fallback={<LoadingSpinner />}>
+                  <MonacoEditor
+                    code={activeContent}
+                    onChange={handleCodeChange}
+                    showLineNumbers={true}
+                    wordWrap="on"
+                  />
+                </Suspense>
               ) : (
                 <div className="h-full flex items-center justify-center text-muted-foreground">
-                  <p>Select a file to edit</p>
+                  Select a file to edit
                 </div>
               )}
             </div>
           </div>
-        </div>
-        <div className="w-1/2 h-full">
-          <PreviewPane currentFileName={currentFileName} />
-        </div>
-      </div>
+        </ResizablePanel>
+      </ResizablePanelGroup>
     </div>
   );
 };
