@@ -27,7 +27,10 @@ function App() {
 
   const handleUndo = () => {
     console.log('Attempting to undo...');
-    // The actual undo functionality is handled by the Monaco editor instance
+  };
+
+  const handleFormatDocument = () => {
+    console.log('Attempting to format document...');
   };
 
   useEffect(() => {
@@ -96,18 +99,6 @@ function App() {
     }
   };
 
-  const handleFormatDocument = () => {
-    const editor = document.querySelector('.monaco-editor')?.getElementsByClassName('monaco-editor')[0];
-    if (editor) {
-      const formatAction = { id: 'editor.action.formatDocument' };
-      editor.dispatchEvent(new CustomEvent('editorFormat', { detail: formatAction }));
-      toast({
-        title: "Code formatted",
-        description: "Document has been formatted.",
-      });
-    }
-  };
-
   return (
     <div className="h-screen flex flex-col">
       <div className="border-b p-4 flex items-center gap-4">
@@ -151,7 +142,6 @@ function App() {
 
           <ResizableHandle withHandle />
 
-          {/* Code Editor and Preview Panel */}
           <ResizablePanel defaultSize={70}>
             <Tabs defaultValue="editor" className="h-full">
               <EditorToolbar
@@ -172,6 +162,7 @@ function App() {
                   wordWrap={wordWrap}
                   onChange={handleCodeChange}
                   onUndo={handleUndo}
+                  onFormat={handleFormatDocument}
                 />
               </TabsContent>
 

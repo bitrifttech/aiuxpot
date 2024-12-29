@@ -33,7 +33,10 @@ export const EditorToolbar = ({
         <Button
           variant="outline"
           size="sm"
-          onClick={onUndo}
+          onClick={() => {
+            console.log('Undo button clicked');
+            onUndo();
+          }}
           title="Undo"
         >
           <Undo className="h-4 w-4" />
@@ -57,7 +60,10 @@ export const EditorToolbar = ({
         <Button
           variant="outline"
           size="sm"
-          onClick={onFormatDocument}
+          onClick={() => {
+            console.log('Format button clicked');
+            onFormatDocument();
+          }}
           title="Format document"
         >
           <FileCode className="h-4 w-4" />

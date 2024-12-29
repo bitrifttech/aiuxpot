@@ -8,6 +8,7 @@ interface MonacoEditorProps {
   wordWrap: "on" | "off";
   onChange: (value: string | undefined) => void;
   onUndo?: () => void;
+  onFormat?: () => void;
 }
 
 export const MonacoEditor = ({
@@ -16,18 +17,29 @@ export const MonacoEditor = ({
   wordWrap,
   onChange,
   onUndo,
+  onFormat,
 }: MonacoEditorProps) => {
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
 
   const handleEditorDidMount = (editor: editor.IStandaloneCodeEditor) => {
     editorRef.current = editor;
-    if (onUndo) {
-      // Update the onUndo prop to trigger the undo command directly on the editor
-      const originalOnUndo = onUndo;
-      originalOnUndo(); // Keep the original callback for logging
-      editor.trigger('keyboard', 'undo', null);
-    }
   };
+
+  // Expose undo method to parent
+  if (onUndo && editorRef.current) {
+    onUndo = () => {
+      console.log('Triggering undo command...');
+      editorRef.current?.trigger('keyboard', 'undo', null);
+    };
+  }
+
+  // Expose format method to parent
+  if (onFormat && editorRef.current) {
+    onFormat = () => {
+      console.log('Triggering format command...');
+      editorRef.current?.getAction('editor.action.formatDocument')?.run();
+    };
+  }
 
   return (
     <Editor
