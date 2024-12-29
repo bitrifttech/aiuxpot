@@ -3,6 +3,9 @@ import { Button } from "@/components/ui/button";
 import { File, FolderOpen, Plus, Trash2, ChevronRight, ChevronDown } from "lucide-react";
 import { memoryFS } from "@/utils/memoryFileSystem";
 import { useState, useEffect } from "react";
+import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { useToast } from "@/hooks/use-toast";
 
 interface FilePaneProps {
   onFileSelect: (fileName: string) => void;
@@ -23,9 +26,11 @@ interface FileTreeStructure {
 export const FilePane = ({ onFileSelect, currentFileName }: FilePaneProps) => {
   const [files, setFiles] = useState<string[]>([]);
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(['/']));
+  const [isNewFileDialogOpen, setIsNewFileDialogOpen] = useState(false);
+  const [newFileName, setNewFileName] = useState("");
+  const { toast } = useToast();
 
   useEffect(() => {
-    // Update files list whenever component mounts or files change
     const updateFiles = () => {
       const filesList = memoryFS.listFiles();
       setFiles(filesList);
@@ -49,6 +54,40 @@ export const FilePane = ({ onFileSelect, currentFileName }: FilePaneProps) => {
     memoryFS.deleteFile(path);
     setFiles(memoryFS.listFiles());
     console.log('File deleted:', path);
+  };
+
+  const handleCreateFile = () => {
+    if (!newFileName.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter a file name",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Add .tsx extension if not provided
+    const fileName = newFileName.endsWith('.tsx') ? newFileName : `${newFileName}.tsx`;
+
+    if (memoryFS.readFile(fileName)) {
+      toast({
+        title: "Error",
+        description: "A file with this name already exists",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    memoryFS.writeFile(fileName, `// ${fileName}\n\nexport default function ${newFileName.split('.')[0]}() {\n  return (\n    <div>\n      New Component\n    </div>\n  );\n}`);
+    setFiles(memoryFS.listFiles());
+    setNewFileName("");
+    setIsNewFileDialogOpen(false);
+    onFileSelect(fileName);
+    
+    toast({
+      title: "Success",
+      description: "File created successfully",
+    });
   };
 
   const toggleFolder = (path: string) => {
@@ -159,7 +198,37 @@ export const FilePane = ({ onFileSelect, currentFileName }: FilePaneProps) => {
   return (
     <div className="h-full border-r bg-background">
       <div className="p-2 border-b">
-        <h2 className="text-sm font-semibold">Files</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold">Files</h2>
+          <Dialog open={isNewFileDialogOpen} onOpenChange={setIsNewFileDialogOpen}>
+            <DialogTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8">
+                <Plus className="h-4 w-4" />
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Create New File</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={(e) => { e.preventDefault(); handleCreateFile(); }} className="space-y-4">
+                <div>
+                  <label htmlFor="fileName" className="text-sm font-medium">
+                    File Name
+                  </label>
+                  <Input
+                    id="fileName"
+                    value={newFileName}
+                    onChange={(e) => setNewFileName(e.target.value)}
+                    placeholder="Enter file name (e.g., MyComponent.tsx)"
+                  />
+                </div>
+                <Button type="submit" className="w-full">
+                  Create File
+                </Button>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
       <ScrollArea className="h-[calc(100%-40px)]">
         <div className="p-2 space-y-1">
