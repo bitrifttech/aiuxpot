@@ -13,7 +13,7 @@ interface FileTreeNode {
   name: string;
   path: string;
   type: 'file' | 'directory';
-  children?: FileTreeNode[];
+  children?: Record<string, FileTreeNode>;
 }
 
 interface FileTreeStructure {
@@ -62,7 +62,7 @@ export const FilePane = ({ onFileSelect, currentFileName }: FilePaneProps) => {
 
     files.forEach(filePath => {
       const parts = filePath.split('/').filter(Boolean);
-      let currentLevel: FileTreeStructure = root;
+      let currentLevel = root;
       let currentPath = '';
 
       parts.forEach((part, index) => {
@@ -76,19 +76,15 @@ export const FilePane = ({ onFileSelect, currentFileName }: FilePaneProps) => {
           };
         }
         if (index !== parts.length - 1) {
-          currentLevel = currentLevel[currentPath].children as FileTreeStructure;
+          currentLevel = currentLevel[currentPath].children || {};
         }
       });
     });
 
-    const convertToArray = (obj: FileTreeStructure): FileTreeNode[] => {
-      return Object.values(obj).map(node => ({
-        ...node,
-        children: node.children ? convertToArray(node.children as FileTreeStructure) : undefined
-      }));
-    };
-
-    return convertToArray(root);
+    return Object.values(root).map(node => ({
+      ...node,
+      children: node.children ? Object.values(node.children) : undefined
+    }));
   };
 
   const renderFileTree = (nodes: FileTreeNode[], level: number = 0) => {
