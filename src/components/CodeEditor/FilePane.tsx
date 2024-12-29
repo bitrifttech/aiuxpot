@@ -16,6 +16,10 @@ interface FileTreeNode {
   children?: FileTreeNode[];
 }
 
+interface FileTreeStructure {
+  [key: string]: FileTreeNode;
+}
+
 export const FilePane = ({ onFileSelect, currentFileName }: FilePaneProps) => {
   const [files, setFiles] = useState<string[]>([]);
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(['/']));
@@ -54,11 +58,11 @@ export const FilePane = ({ onFileSelect, currentFileName }: FilePaneProps) => {
   };
 
   const buildFileTree = (files: string[]): FileTreeNode[] => {
-    const root: { [key: string]: FileTreeNode } = {};
+    const root: FileTreeStructure = {};
 
     files.forEach(filePath => {
       const parts = filePath.split('/').filter(Boolean);
-      let currentLevel = root;
+      let currentLevel: FileTreeStructure = root;
       let currentPath = '';
 
       parts.forEach((part, index) => {
@@ -72,15 +76,15 @@ export const FilePane = ({ onFileSelect, currentFileName }: FilePaneProps) => {
           };
         }
         if (index !== parts.length - 1) {
-          currentLevel = currentLevel[currentPath].children as { [key: string]: FileTreeNode };
+          currentLevel = currentLevel[currentPath].children as FileTreeStructure;
         }
       });
     });
 
-    const convertToArray = (obj: { [key: string]: FileTreeNode }): FileTreeNode[] => {
+    const convertToArray = (obj: FileTreeStructure): FileTreeNode[] => {
       return Object.values(obj).map(node => ({
         ...node,
-        children: node.children ? convertToArray(node.children as { [key: string]: FileTreeNode }) : undefined
+        children: node.children ? convertToArray(node.children as FileTreeStructure) : undefined
       }));
     };
 
