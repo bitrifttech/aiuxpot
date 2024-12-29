@@ -3,6 +3,7 @@ import { Project } from "@/types/project";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "./ui/card";
 import { useToast } from "@/hooks/use-toast";
+import { useNavigate } from "react-router-dom";
 
 interface ProjectCardProps {
   project: Project;
@@ -11,8 +12,10 @@ interface ProjectCardProps {
 
 export function ProjectCard({ project, onDelete }: ProjectCardProps) {
   const { toast } = useToast();
+  const navigate = useNavigate();
 
-  const handleDelete = () => {
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
     onDelete(project.id);
     toast({
       title: "Project deleted",
@@ -20,8 +23,15 @@ export function ProjectCard({ project, onDelete }: ProjectCardProps) {
     });
   };
 
+  const handleClick = () => {
+    navigate(`/design?projectId=${project.id}`, { state: { project } });
+  };
+
   return (
-    <Card className="hover:border-primary/50 transition-colors">
+    <Card 
+      className="hover:border-primary/50 transition-colors cursor-pointer"
+      onClick={handleClick}
+    >
       <CardHeader>
         <CardTitle className="flex justify-between items-center">
           <span>{project.title}</span>
