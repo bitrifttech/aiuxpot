@@ -4,7 +4,9 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Download } from "lucide-react";
+import Editor from "@monaco-editor/react";
+import { useToast } from "@/components/ui/use-toast";
 
 const Design = () => {
   const location = useLocation();
@@ -12,6 +14,13 @@ const Design = () => {
   const project = location.state?.project;
   const [messages, setMessages] = useState<Array<{ role: 'user' | 'assistant', content: string }>>([]);
   const [input, setInput] = useState("");
+  const [code, setCode] = useState(`// Welcome to the code editor
+function App() {
+  return (
+    <div>Hello World</div>
+  );
+}`);
+  const { toast } = useToast();
 
   if (!project) {
     navigate('/');
@@ -32,6 +41,30 @@ const Design = () => {
         content: "This is a simulated response. In a real implementation, this would be connected to an AI service." 
       }]);
     }, 1000);
+  };
+
+  const handleCodeChange = (value: string | undefined) => {
+    if (value) {
+      setCode(value);
+      console.log('Code updated:', value);
+    }
+  };
+
+  const handleDownloadCode = () => {
+    const blob = new Blob([code], { type: 'text/plain' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'code.tsx';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+    
+    toast({
+      title: "Code downloaded",
+      description: "Your code has been downloaded successfully.",
+    });
   };
 
   return (
@@ -81,24 +114,39 @@ const Design = () => {
           {/* Code Editor and Preview Panel */}
           <ResizablePanel defaultSize={70}>
             <Tabs defaultValue="editor" className="h-full">
-              <div className="border-b px-4">
+              <div className="border-b px-4 flex justify-between items-center">
                 <TabsList>
                   <TabsTrigger value="editor">Code Editor</TabsTrigger>
                   <TabsTrigger value="preview">Preview</TabsTrigger>
                 </TabsList>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                  onClick={handleDownloadCode}
+                >
+                  <Download className="h-4 w-4" />
+                  Download Code
+                </Button>
               </div>
 
-              <TabsContent value="editor" className="h-[calc(100%-50px)] p-4">
-                <div className="h-full rounded-lg border bg-muted p-4">
-                  <pre className="font-mono text-sm">
-                    {`// Your code will appear here
-function App() {
-  return (
-    <div>Hello World</div>
-  );
-}`}
-                  </pre>
-                </div>
+              <TabsContent value="editor" className="h-[calc(100%-50px)]">
+                <Editor
+                  height="100%"
+                  defaultLanguage="typescript"
+                  defaultValue={code}
+                  theme="vs-dark"
+                  onChange={handleCodeChange}
+                  options={{
+                    minimap: { enabled: false },
+                    fontSize: 14,
+                    wordWrap: "on",
+                    automaticLayout: true,
+                    tabSize: 2,
+                    formatOnPaste: true,
+                    formatOnType: true,
+                  }}
+                />
               </TabsContent>
 
               <TabsContent value="preview" className="h-[calc(100%-50px)] p-4">
