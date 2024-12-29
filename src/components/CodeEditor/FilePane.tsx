@@ -30,10 +30,16 @@ export const FilePane = ({ onFileSelect, currentFileName }: FilePaneProps) => {
       const filesList = memoryFS.listFiles();
       setFiles(filesList);
       console.log('Files list updated:', filesList);
+      
+      // If we have files and no current file is selected, select the first one
+      if (filesList.length > 0 && !currentFileName) {
+        console.log('Selecting initial file:', filesList[0]);
+        onFileSelect(filesList[0]);
+      }
     };
 
     updateFiles();
-  }, []);
+  }, [currentFileName, onFileSelect]);
 
   const handleFileClick = (fileName: string) => {
     onFileSelect(fileName);
