@@ -22,9 +22,10 @@ export const MonacoEditor = ({
   const handleEditorDidMount = (editor: editor.IStandaloneCodeEditor) => {
     editorRef.current = editor;
     if (onUndo) {
-      onUndo = () => {
-        editor.trigger('keyboard', 'undo', null);
-      };
+      // Update the onUndo prop to trigger the undo command directly on the editor
+      const originalOnUndo = onUndo;
+      originalOnUndo(); // Keep the original callback for logging
+      editor.trigger('keyboard', 'undo', null);
     }
   };
 
