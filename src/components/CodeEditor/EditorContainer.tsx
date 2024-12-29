@@ -32,14 +32,114 @@ interface EditorPane {
   activeTab?: string;
 }
 
+interface SavedEditorState {
+  panes: EditorPane[];
+  activePaneId: string;
+  timestamp: number;
+}
+
+const EDITOR_STATE_KEY = 'aiuxpot-editor-state';
+
 export const EditorContainer = () => {
-  const [panes, setPanes] = useState<EditorPane[]>([
-    { id: 'main', tabs: [], activeTab: undefined }
-  ]);
-  const [activePaneId, setActivePaneId] = useState('main');
+  // Initialize state from localStorage or use defaults
+  const [panes, setPanes] = useState<EditorPane[]>(() => {
+    try {
+      console.log('Initializing editor state...');
+      const savedState = localStorage.getItem(EDITOR_STATE_KEY);
+      if (savedState) {
+        console.log('Found saved state:', savedState);
+        const { panes, timestamp } = JSON.parse(savedState) as SavedEditorState;
+        // Only restore if saved within last 24 hours
+        if (Date.now() - timestamp < 24 * 60 * 60 * 1000) {
+          console.log('Restoring saved panes:', panes);
+          return panes;
+        } else {
+          console.log('Saved state expired');
+        }
+      } else {
+        console.log('No saved state found');
+      }
+    } catch (error) {
+      console.error('Error loading editor state:', error);
+    }
+    return [{ id: 'main', tabs: [], activeTab: undefined }];
+  });
+
+  const [activePaneId, setActivePaneId] = useState<string>(() => {
+    try {
+      const savedState = localStorage.getItem(EDITOR_STATE_KEY);
+      if (savedState) {
+        const { activePaneId, timestamp } = JSON.parse(savedState) as SavedEditorState;
+        if (Date.now() - timestamp < 24 * 60 * 60 * 1000) {
+          console.log('Restoring active pane:', activePaneId);
+          return activePaneId;
+        }
+      }
+    } catch (error) {
+      console.error('Error loading active pane:', error);
+    }
+    return 'main';
+  });
+
   const [isLoading, setIsLoading] = useState(false);
-  const editorRef = useRef<editor.IStandaloneCodeEditor>();
   const { toast } = useToast();
+
+  // Load file contents when component mounts
+  useEffect(() => {
+    const loadFileContents = async () => {
+      console.log('Loading file contents...');
+      setIsLoading(true);
+      try {
+        const updatedPanes = await Promise.all(
+          panes.map(async (pane) => {
+            const updatedTabs = await Promise.all(
+              pane.tabs.map(async (tab) => {
+                try {
+                  console.log('Loading file content for:', tab.path);
+                  const content = await fileApi.readFile(tab.path);
+                  if (content !== null) {
+                    console.log('Content loaded for:', tab.path);
+                    return { ...tab, content };
+                  }
+                  console.warn('No content found for:', tab.path);
+                } catch (error) {
+                  console.error('Error loading file:', tab.path, error);
+                }
+                return tab;
+              })
+            );
+            return { ...pane, tabs: updatedTabs };
+          })
+        );
+        setPanes(updatedPanes);
+      } catch (error) {
+        console.error('Error loading file contents:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load some files",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (panes.some(pane => pane.tabs.length > 0)) {
+      loadFileContents();
+    }
+  }, []); // Only run once when component mounts
+
+  // Save state to localStorage whenever it changes
+  useEffect(() => {
+    console.log('Saving editor state...');
+    const state: SavedEditorState = {
+      panes,
+      activePaneId,
+      timestamp: Date.now()
+    };
+    localStorage.setItem(EDITOR_STATE_KEY, JSON.stringify(state));
+    console.log('State saved:', state);
+  }, [panes, activePaneId]);
 
   // Auto-save debounced function
   const debouncedSave = useCallback(

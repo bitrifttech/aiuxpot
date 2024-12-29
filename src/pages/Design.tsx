@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useState, lazy, Suspense } from "react";
+import { useState } from "react";
 import { EditorContainer } from "@/components/CodeEditor/EditorContainer";
 
 const Design = () => {
@@ -14,13 +14,6 @@ const Design = () => {
   const project = projects.find(p => p.id === projectId);
   const [messages, setMessages] = useState<Array<{ role: 'user' | 'assistant', content: string }>>([]);
   const [input, setInput] = useState("");
-  const [code, setCode] = useState(`// Welcome to the editor
-// Start typing your code here...
-
-function greet(name: string) {
-  return \`Hello, \${name}!\`;
-}
-`);
 
   if (!project) {
     return null;
@@ -85,7 +78,7 @@ function greet(name: string) {
           <ResizableHandle withHandle />
 
           <ResizablePanel defaultSize={70}>
-            <EditorContainer code={code} onChange={value => value && setCode(value)} />
+            <EditorContainer />
           </ResizablePanel>
         </ResizablePanelGroup>
       </div>

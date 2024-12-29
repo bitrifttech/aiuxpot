@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
+import { fileApi } from '@/utils/fileApi';
 
 interface FileTreeItem {
   name: string;
@@ -49,7 +50,7 @@ const TreeNode = ({
     if (!newItemName.trim()) {
       toast({
         title: "Error",
-        description: "Name cannot be empty",
+        description: "Please enter a name",
         variant: "destructive",
       });
       return;
@@ -61,98 +62,109 @@ const TreeNode = ({
     } else {
       onCreateDirectory(newPath);
     }
+
     setShowNewItemDialog(false);
     setNewItemName('');
   };
 
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onDeleteItem(item.path);
+  };
+
   return (
     <div>
-      <div 
+      <div
         className={cn(
-          "flex items-center gap-2 p-1 rounded-md hover:bg-accent group",
-          currentFile === item.path && "bg-accent"
+          "flex items-center gap-2 p-2 rounded-lg cursor-pointer hover:bg-accent group",
+          currentFile === item.path && "bg-accent",
+          level > 0 && "ml-4"
         )}
-        style={{ paddingLeft: `${level * 12}px` }}
+        onClick={() => item.type === 'file' ? onFileSelect(item.path) : setIsExpanded(!isExpanded)}
       >
         {item.type === 'directory' ? (
-          <button
-            onClick={() => setIsExpanded(!isExpanded)}
-            className="p-1 hover:bg-accent rounded-sm"
-          >
-            {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-          </button>
+          <>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-4 w-4 p-0"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsExpanded(!isExpanded);
+              }}
+            >
+              {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+            </Button>
+            <Folder className="h-4 w-4 text-blue-500" />
+          </>
         ) : (
-          <span className="w-6" />
+          <>
+            <div className="w-4" />
+            <File className="h-4 w-4 text-gray-500" />
+          </>
         )}
-        
-        <span 
-          onClick={() => item.type === 'file' && onFileSelect(item.path)}
-          className={cn(
-            "flex items-center gap-2 flex-1 cursor-pointer py-1",
-            item.type === 'file' && "hover:text-primary"
-          )}
-        >
-          {item.type === 'directory' ? (
-            <Folder className="h-4 w-4 text-muted-foreground" />
-          ) : (
-            <File className="h-4 w-4 text-muted-foreground" />
-          )}
-          {item.name}
-        </span>
-
+        <span className="flex-1">{item.name}</span>
         <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1">
           {item.type === 'directory' && (
-            <Dialog open={showNewItemDialog} onOpenChange={setShowNewItemDialog}>
-              <DialogTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-6 w-6">
-                  <Plus className="h-4 w-4" />
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Create New Item</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4 pt-4">
-                  <div className="flex gap-4">
-                    <Button
-                      variant={newItemType === 'file' ? 'default' : 'outline'}
-                      onClick={() => setNewItemType('file')}
-                      className="flex-1"
-                    >
-                      <File className="h-4 w-4 mr-2" />
-                      File
-                    </Button>
-                    <Button
-                      variant={newItemType === 'directory' ? 'default' : 'outline'}
-                      onClick={() => setNewItemType('directory')}
-                      className="flex-1"
-                    >
-                      <Folder className="h-4 w-4 mr-2" />
-                      Directory
-                    </Button>
-                  </div>
-                  <Input
-                    placeholder={`Enter ${newItemType} name`}
-                    value={newItemName}
-                    onChange={(e) => setNewItemName(e.target.value)}
-                  />
-                  <Button onClick={handleCreateItem} className="w-full">
-                    Create
-                  </Button>
-                </div>
-              </DialogContent>
-            </Dialog>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowNewItemDialog(true);
+              }}
+            >
+              <Plus className="h-4 w-4" />
+            </Button>
           )}
           <Button
             variant="ghost"
             size="icon"
-            className="h-6 w-6"
-            onClick={() => onDeleteItem(item.path)}
+            className="h-6 w-6 text-destructive"
+            onClick={handleDelete}
           >
             <Trash2 className="h-4 w-4" />
           </Button>
         </div>
       </div>
+
+      {showNewItemDialog && (
+        <Dialog open={showNewItemDialog} onOpenChange={setShowNewItemDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Create New {newItemType === 'file' ? 'File' : 'Directory'}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="flex gap-2">
+                <Button
+                  variant={newItemType === 'file' ? 'default' : 'outline'}
+                  onClick={() => setNewItemType('file')}
+                >
+                  File
+                </Button>
+                <Button
+                  variant={newItemType === 'directory' ? 'default' : 'outline'}
+                  onClick={() => setNewItemType('directory')}
+                >
+                  Directory
+                </Button>
+              </div>
+              <Input
+                value={newItemName}
+                onChange={(e) => setNewItemName(e.target.value)}
+                placeholder={newItemType === 'file' ? 'filename.ext' : 'directory-name'}
+              />
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setShowNewItemDialog(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleCreateItem}>Create</Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
 
       {item.type === 'directory' && isExpanded && item.children && (
         <div>
@@ -174,42 +186,100 @@ const TreeNode = ({
   );
 };
 
-export const FileTree = ({
+export function FileTree({
   currentFile,
   onFileSelect,
   onCreateFile,
   onCreateDirectory,
   onDeleteItem
-}: FileTreeProps) => {
+}: FileTreeProps) {
+  const [fileTree, setFileTree] = useState<FileTreeItem[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [fileStructure, setFileStructure] = useState<FileTreeItem[]>([]);
   const { toast } = useToast();
 
   useEffect(() => {
-    const fetchFileStructure = async () => {
+    const loadFileTree = async () => {
       try {
-        const response = await fetch('/api/files');
-        if (!response.ok) {
-          throw new Error('Failed to fetch file structure');
-        }
-        const data = await response.json();
-        setFileStructure(data);
+        const files = await fileApi.listFiles();
+        const tree = buildFileTree(files);
+        setFileTree(tree);
       } catch (error) {
-        console.error('Error fetching file structure:', error);
+        console.error('Error loading file tree:', error);
         toast({
           title: "Error",
-          description: "Failed to load file structure",
+          description: "Failed to load file tree",
           variant: "destructive",
         });
       }
     };
 
-    fetchFileStructure();
-  }, [toast]);
+    loadFileTree();
+  }, []);
+
+  const buildFileTree = (files: string[]): FileTreeItem[] => {
+    const root: { [key: string]: FileTreeItem } = {};
+
+    files.forEach(path => {
+      const parts = path.split('/');
+      let current = root;
+
+      parts.forEach((part, index) => {
+        if (!current[part]) {
+          current[part] = {
+            name: part,
+            type: index === parts.length - 1 ? 'file' : 'directory',
+            path: parts.slice(0, index + 1).join('/'),
+            children: index === parts.length - 1 ? undefined : {}
+          };
+        }
+        if (index < parts.length - 1) {
+          current = current[part].children as { [key: string]: FileTreeItem };
+        }
+      });
+    });
+
+    const sortItems = (items: FileTreeItem[]): FileTreeItem[] => {
+      return items.sort((a, b) => {
+        if (a.type === b.type) {
+          return a.name.localeCompare(b.name);
+        }
+        return a.type === 'directory' ? -1 : 1;
+      });
+    };
+
+    const convertToArray = (obj: { [key: string]: FileTreeItem }): FileTreeItem[] => {
+      return sortItems(
+        Object.values(obj).map(item => ({
+          ...item,
+          children: item.children ? convertToArray(item.children as { [key: string]: FileTreeItem }) : undefined
+        }))
+      );
+    };
+
+    return convertToArray(root);
+  };
+
+  const filterTree = (items: FileTreeItem[], query: string): FileTreeItem[] => {
+    if (!query) return items;
+
+    return items.reduce<FileTreeItem[]>((filtered, item) => {
+      if (item.name.toLowerCase().includes(query.toLowerCase())) {
+        filtered.push(item);
+      } else if (item.children) {
+        const filteredChildren = filterTree(item.children, query);
+        if (filteredChildren.length > 0) {
+          filtered.push({ ...item, children: filteredChildren });
+        }
+      }
+      return filtered;
+    }, []);
+  };
+
+  const filteredTree = filterTree(fileTree, searchQuery);
 
   return (
     <div className="h-full flex flex-col">
-      <div className="p-2 border-b">
+      <div className="p-2">
         <div className="relative">
           <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
@@ -222,7 +292,7 @@ export const FileTree = ({
       </div>
       <ScrollArea className="flex-1">
         <div className="p-2">
-          {fileStructure.map((item) => (
+          {filteredTree.map((item) => (
             <TreeNode
               key={item.path}
               item={item}
@@ -237,4 +307,4 @@ export const FileTree = ({
       </ScrollArea>
     </div>
   );
-};
+}
