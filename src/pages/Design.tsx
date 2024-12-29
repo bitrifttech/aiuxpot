@@ -9,6 +9,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { EditorToolbar } from "@/components/CodeEditor/EditorToolbar";
 import { MonacoEditor } from "@/components/CodeEditor/MonacoEditor";
 import { Preview } from "@/components/CodeEditor/Preview";
+import { memoryFS } from "@/utils/memoryFileSystem";
 import type { editor } from "monaco-editor";
 
 const Design = () => {
@@ -72,9 +73,20 @@ function App() {
   const handleCodeChange = (value: string | undefined) => {
     if (value) {
       setCode(value);
-      console.log('Code updated:', value);
+      // Store the code in memory file system
+      memoryFS.writeFile('current-code.tsx', value);
+      console.log('Code updated and stored in memory');
     }
   };
+
+  useEffect(() => {
+    // Try to load existing code from memory on component mount
+    const savedCode = memoryFS.readFile('current-code.tsx');
+    if (savedCode) {
+      setCode(savedCode);
+      console.log('Loaded existing code from memory');
+    }
+  }, []);
 
   const handleDownloadCode = () => {
     const blob = new Blob([code], { type: 'text/plain' });
@@ -87,9 +99,12 @@ function App() {
     document.body.removeChild(a);
     window.URL.revokeObjectURL(url);
     
+    // Also save to memory
+    memoryFS.writeFile('downloaded-code.tsx', code);
+    
     toast({
       title: "Code downloaded",
-      description: "Your code has been downloaded successfully.",
+      description: "Your code has been downloaded and saved to memory.",
     });
   };
 
