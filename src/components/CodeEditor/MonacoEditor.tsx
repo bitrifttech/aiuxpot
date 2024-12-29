@@ -1,5 +1,5 @@
 import Editor from "@monaco-editor/react";
-import { useRef, useEffect } from "react";
+import { useEffect, forwardRef } from "react";
 import type { editor } from "monaco-editor";
 
 interface MonacoEditorProps {
@@ -11,37 +11,47 @@ interface MonacoEditorProps {
   onFormat?: () => void;
 }
 
-export const MonacoEditor = ({
+export const MonacoEditor = forwardRef<editor.IStandaloneCodeEditor, MonacoEditorProps>(({
   code,
   showLineNumbers,
   wordWrap,
   onChange,
   onUndo,
   onFormat,
-}: MonacoEditorProps) => {
-  const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
-
+}, ref) => {
   const handleEditorDidMount = (editor: editor.IStandaloneCodeEditor) => {
-    editorRef.current = editor;
+    if (typeof ref === 'function') {
+      ref(editor);
+    } else if (ref) {
+      ref.current = editor;
+    }
   };
 
   useEffect(() => {
-    if (editorRef.current && onUndo) {
+    if (ref && onUndo) {
       onUndo = () => {
         console.log('Executing undo command...');
-        editorRef.current?.trigger('keyboard', 'undo', null);
+        if (typeof ref === 'function') {
+          // Handle function ref case
+        } else if (ref.current) {
+          ref.current.trigger('keyboard', 'undo', null);
+        }
       };
     }
-  }, [editorRef.current, onUndo]);
+  }, [ref, onUndo]);
 
   useEffect(() => {
-    if (editorRef.current && onFormat) {
+    if (ref && onFormat) {
       onFormat = () => {
         console.log('Executing format command...');
-        editorRef.current?.getAction('editor.action.formatDocument')?.run();
+        if (typeof ref === 'function') {
+          // Handle function ref case
+        } else if (ref.current) {
+          ref.current.getAction('editor.action.formatDocument')?.run();
+        }
       };
     }
-  }, [editorRef.current, onFormat]);
+  }, [ref, onFormat]);
 
   return (
     <Editor
@@ -67,4 +77,6 @@ export const MonacoEditor = ({
       }}
     />
   );
-};
+});
+
+MonacoEditor.displayName = 'MonacoEditor';
