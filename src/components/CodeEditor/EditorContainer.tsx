@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { EditorToolbar } from "./EditorToolbar";
 import { MonacoEditor } from "./MonacoEditor";
@@ -20,6 +20,14 @@ function App() {
   const [wordWrap, setWordWrap] = useState<"on" | "off">("on");
   const { toast } = useToast();
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
+
+  // Initialize the default file in memory if it doesn't exist
+  useEffect(() => {
+    if (!memoryFS.readFile(currentFileName)) {
+      memoryFS.writeFile(currentFileName, code);
+      console.log('Initialized default file in memory:', currentFileName);
+    }
+  }, []);
 
   const handleUndo = () => {
     console.log('Attempting to undo...');
@@ -50,6 +58,8 @@ function App() {
       setCurrentFileName(fileName);
       setCode(content);
       console.log('File content loaded into editor:', fileName);
+    } else {
+      console.log('No content found for file:', fileName);
     }
   };
 
