@@ -8,6 +8,8 @@ import { ArrowLeft } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { EditorToolbar } from "@/components/CodeEditor/EditorToolbar";
 import { MonacoEditor } from "@/components/CodeEditor/MonacoEditor";
+import { Preview } from "@/components/CodeEditor/Preview";
+import type { editor } from "monaco-editor";
 
 const Design = () => {
   const location = useLocation();
@@ -24,7 +26,8 @@ function App() {
   const [showLineNumbers, setShowLineNumbers] = useState(true);
   const [wordWrap, setWordWrap] = useState<"on" | "off">("on");
   const { toast } = useToast();
-  const editorRef = useRef(null);
+
+  const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
 
   const handleUndo = () => {
     console.log('Attempting to undo...');
@@ -176,7 +179,7 @@ function App() {
 
               <TabsContent value="preview" className="h-[calc(100%-50px)] p-4">
                 <div className="h-full rounded-lg border bg-background p-4">
-                  Preview content will appear here
+                  <Preview code={code} />
                 </div>
               </TabsContent>
             </Tabs>
