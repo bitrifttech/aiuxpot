@@ -1,98 +1,141 @@
-import Editor from "@monaco-editor/react";
-import { useEffect, forwardRef } from "react";
-import type { editor } from "monaco-editor";
+import { useEffect, useRef } from 'react';
+import Editor, { Monaco } from '@monaco-editor/react';
+import { editor } from 'monaco-editor';
 
 interface MonacoEditorProps {
   code: string;
-  showLineNumbers: boolean;
-  wordWrap: "on" | "off";
-  onChange: (value: string | undefined) => void;
-  onUndo?: () => void;
-  onFormat?: () => void;
+  onChange?: (value: string | undefined) => void;
+  showLineNumbers?: boolean;
+  wordWrap?: 'on' | 'off';
+  language?: string;
+  onMount?: (editor: editor.IStandaloneCodeEditor, monaco: Monaco) => void;
 }
 
-export const MonacoEditor = forwardRef<editor.IStandaloneCodeEditor, MonacoEditorProps>(({
+export const MonacoEditor = ({
   code,
-  showLineNumbers,
-  wordWrap,
   onChange,
-  onUndo,
-  onFormat,
-}, ref) => {
-  const handleEditorDidMount = (editor: editor.IStandaloneCodeEditor) => {
-    if (typeof ref === 'function') {
-      ref(editor);
-    } else if (ref) {
-      ref.current = editor;
-    }
-    
-    // Set initial value
-    editor.setValue(code);
-    console.log('Editor mounted with initial code:', code);
+  showLineNumbers = true,
+  wordWrap = 'on',
+  language,
+  onMount
+}: MonacoEditorProps) => {
+  const editorRef = useRef<editor.IStandaloneCodeEditor>();
+  const monacoRef = useRef<Monaco>();
+
+  // Handle editor mounting
+  const handleEditorDidMount = (editor: editor.IStandaloneCodeEditor, monaco: Monaco) => {
+    editorRef.current = editor;
+    monacoRef.current = monaco;
+
+    // Add keyboard shortcuts
+    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyF, () => {
+      editor.getAction('actions.find').run();
+    });
+
+    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyH, () => {
+      editor.getAction('editor.action.startFindReplaceAction').run();
+    });
+
+    editor.addCommand(monaco.KeyMod.Alt | monaco.KeyMod.Shift | monaco.KeyCode.KeyF, () => {
+      editor.getAction('editor.action.formatDocument').run();
+    });
+
+    // Configure editor
+    monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions({
+      noSemanticValidation: false,
+      noSyntaxValidation: false,
+    });
+
+    monaco.languages.typescript.typescriptDefaults.setCompilerOptions({
+      target: monaco.languages.typescript.ScriptTarget.ESNext,
+      allowNonTsExtensions: true,
+      moduleResolution: monaco.languages.typescript.ModuleResolutionKind.NodeJs,
+      module: monaco.languages.typescript.ModuleKind.ESNext,
+      noEmit: true,
+      esModuleInterop: true,
+      jsx: monaco.languages.typescript.JsxEmit.React,
+      reactNamespace: 'React',
+      allowJs: true,
+      typeRoots: ['node_modules/@types'],
+    });
+
+    // Add custom actions
+    editor.addAction({
+      id: 'format-code',
+      label: 'Format Code',
+      keybindings: [monaco.KeyMod.Alt | monaco.KeyMod.Shift | monaco.KeyCode.KeyF],
+      run: async (ed) => {
+        await ed.getAction('editor.action.formatDocument').run();
+      },
+    });
+
+    // Call user's onMount if provided
+    onMount?.(editor, monaco);
   };
 
-  // Update editor value when code prop changes
-  useEffect(() => {
-    console.log('Code prop updated:', code);
-    if (ref && typeof ref !== 'function' && ref.current) {
-      const currentValue = ref.current.getValue();
-      if (currentValue !== code) {
-        console.log('Updating editor value to:', code);
-        ref.current.setValue(code);
-      }
-    }
-  }, [code, ref]);
+  // Detect file type for syntax highlighting
+  const detectLanguage = (filename?: string): string => {
+    if (language) return language;
+    if (!filename) return 'typescript';
 
-  useEffect(() => {
-    if (ref && onUndo) {
-      onUndo = () => {
-        console.log('Executing undo command...');
-        if (typeof ref === 'function') {
-          // Handle function ref case
-        } else if (ref.current) {
-          ref.current.trigger('keyboard', 'undo', null);
-        }
-      };
+    const ext = filename.split('.').pop()?.toLowerCase();
+    switch (ext) {
+      case 'js':
+        return 'javascript';
+      case 'jsx':
+        return 'javascript';
+      case 'ts':
+        return 'typescript';
+      case 'tsx':
+        return 'typescript';
+      case 'json':
+        return 'json';
+      case 'html':
+        return 'html';
+      case 'css':
+        return 'css';
+      case 'scss':
+        return 'scss';
+      case 'md':
+        return 'markdown';
+      default:
+        return 'typescript';
     }
-  }, [ref, onUndo]);
-
-  useEffect(() => {
-    if (ref && onFormat) {
-      onFormat = () => {
-        console.log('Executing format command...');
-        if (typeof ref === 'function') {
-          // Handle function ref case
-        } else if (ref.current) {
-          ref.current.getAction('editor.action.formatDocument')?.run();
-        }
-      };
-    }
-  }, [ref, onFormat]);
+  };
 
   return (
     <Editor
       height="100%"
-      defaultLanguage="typescript"
+      defaultLanguage={detectLanguage(language)}
       value={code}
-      theme="vs-dark"
       onChange={onChange}
-      onMount={handleEditorDidMount}
       options={{
         minimap: { enabled: false },
         fontSize: 14,
-        wordWrap: wordWrap,
-        lineNumbers: showLineNumbers ? "on" : "off",
-        folding: true,
-        foldingHighlight: true,
-        foldingStrategy: 'auto',
-        showFoldingControls: 'always',
+        lineNumbers: showLineNumbers ? 'on' : 'off',
+        roundedSelection: false,
+        scrollBeyondLastLine: false,
+        readOnly: false,
         automaticLayout: true,
-        tabSize: 2,
+        wordWrap: wordWrap,
         formatOnPaste: true,
         formatOnType: true,
+        suggestOnTriggerCharacters: true,
+        tabSize: 2,
+        insertSpaces: true,
+        quickSuggestions: true,
+        snippetSuggestions: 'inline',
+        scrollbar: {
+          vertical: 'visible',
+          horizontal: 'visible',
+          useShadows: false,
+          verticalHasArrows: false,
+          horizontalHasArrows: false,
+        },
       }}
+      onMount={handleEditorDidMount}
     />
   );
-});
+};
 
 MonacoEditor.displayName = 'MonacoEditor';

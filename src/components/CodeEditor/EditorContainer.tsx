@@ -4,8 +4,11 @@ import { TabsManager } from './TabsManager';
 import { useToast } from '@/components/ui/use-toast';
 import { fileApi } from '@/utils/fileApi';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
+import { Button } from '@/components/ui/button';
+import { SplitSquareHorizontal, X } from 'lucide-react';
 import debounce from 'lodash/debounce';
 import type { editor } from 'monaco-editor';
+import React from 'react';
 
 const MonacoEditor = lazy(() => import("./MonacoEditor").then(module => ({
   default: module.MonacoEditor
@@ -23,9 +26,17 @@ interface OpenTab {
   isDirty: boolean;
 }
 
+interface EditorPane {
+  id: string;
+  tabs: OpenTab[];
+  activeTab?: string;
+}
+
 export const EditorContainer = () => {
-  const [openTabs, setOpenTabs] = useState<OpenTab[]>([]);
-  const [activeTab, setActiveTab] = useState<string>();
+  const [panes, setPanes] = useState<EditorPane[]>([
+    { id: 'main', tabs: [], activeTab: undefined }
+  ]);
+  const [activePaneId, setActivePaneId] = useState('main');
   const [isLoading, setIsLoading] = useState(false);
   const editorRef = useRef<editor.IStandaloneCodeEditor>();
   const { toast } = useToast();
@@ -35,10 +46,13 @@ export const EditorContainer = () => {
     debounce(async (path: string, content: string) => {
       try {
         await fileApi.writeFile(path, content);
-        setOpenTabs(tabs =>
-          tabs.map(tab =>
-            tab.path === path ? { ...tab, isDirty: false } : tab
-          )
+        setPanes(currentPanes => 
+          currentPanes.map(pane => ({
+            ...pane,
+            tabs: pane.tabs.map(tab =>
+              tab.path === path ? { ...tab, isDirty: false } : tab
+            )
+          }))
         );
         toast({
           title: "Saved",
@@ -60,8 +74,9 @@ export const EditorContainer = () => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 's') {
         e.preventDefault();
-        if (activeTab) {
-          const tab = openTabs.find(t => t.path === activeTab);
+        const activePane = panes.find(p => p.id === activePaneId);
+        if (activePane?.activeTab) {
+          const tab = activePane.tabs.find(t => t.path === activePane.activeTab);
           if (tab) {
             debouncedSave(tab.path, tab.content);
           }
@@ -71,12 +86,21 @@ export const EditorContainer = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activeTab, openTabs, debouncedSave]);
+  }, [activePaneId, panes, debouncedSave]);
 
   const handleFileSelect = async (path: string) => {
-    // If file is already open, just switch to it
-    if (openTabs.some(tab => tab.path === path)) {
-      setActiveTab(path);
+    const activePane = panes.find(p => p.id === activePaneId);
+    if (!activePane) return;
+
+    // If file is already open in the active pane, just switch to it
+    if (activePane.tabs.some(tab => tab.path === path)) {
+      setPanes(currentPanes =>
+        currentPanes.map(pane =>
+          pane.id === activePaneId
+            ? { ...pane, activeTab: path }
+            : pane
+        )
+      );
       return;
     }
 
@@ -93,8 +117,17 @@ export const EditorContainer = () => {
         return;
       }
 
-      setOpenTabs(tabs => [...tabs, { path, content, isDirty: false }]);
-      setActiveTab(path);
+      setPanes(currentPanes =>
+        currentPanes.map(pane =>
+          pane.id === activePaneId
+            ? {
+                ...pane,
+                tabs: [...pane.tabs, { path, content, isDirty: false }],
+                activeTab: path
+              }
+            : pane
+        )
+      );
     } catch (error) {
       console.error('Error loading file:', error);
       toast({
@@ -107,31 +140,54 @@ export const EditorContainer = () => {
     }
   };
 
-  const handleTabClose = (path: string) => {
-    const tab = openTabs.find(t => t.path === path);
+  const handleTabClose = (paneId: string, path: string) => {
+    const pane = panes.find(p => p.id === paneId);
+    if (!pane) return;
+
+    const tab = pane.tabs.find(t => t.path === path);
     if (tab?.isDirty) {
       // TODO: Show confirmation dialog
       debouncedSave(path, tab.content);
     }
-    setOpenTabs(tabs => tabs.filter(t => t.path !== path));
-    if (activeTab === path) {
-      setActiveTab(openTabs[openTabs.length - 2]?.path);
-    }
+
+    setPanes(currentPanes =>
+      currentPanes.map(pane =>
+        pane.id === paneId
+          ? {
+              ...pane,
+              tabs: pane.tabs.filter(t => t.path !== path),
+              activeTab: pane.activeTab === path
+                ? pane.tabs[pane.tabs.length - 2]?.path
+                : pane.activeTab
+            }
+          : pane
+      )
+    );
   };
 
-  const handleCodeChange = (value: string | undefined) => {
-    if (!activeTab || !value) return;
+  const handleCodeChange = (paneId: string, value: string | undefined) => {
+    if (!value) return;
     
-    setOpenTabs(tabs =>
-      tabs.map(tab =>
-        tab.path === activeTab
-          ? { ...tab, content: value, isDirty: true }
-          : tab
+    const pane = panes.find(p => p.id === paneId);
+    if (!pane?.activeTab) return;
+
+    setPanes(currentPanes =>
+      currentPanes.map(pane =>
+        pane.id === paneId
+          ? {
+              ...pane,
+              tabs: pane.tabs.map(tab =>
+                tab.path === pane.activeTab
+                  ? { ...tab, content: value, isDirty: true }
+                  : tab
+              )
+            }
+          : pane
       )
     );
     
     // Trigger auto-save
-    debouncedSave(activeTab, value);
+    debouncedSave(pane.activeTab, value);
   };
 
   const handleCreateFile = async (path: string) => {
@@ -158,7 +214,16 @@ export const EditorContainer = () => {
   const handleDeleteItem = async (path: string) => {
     try {
       await fileApi.deleteFile(path);
-      handleTabClose(path);
+      // Close all tabs with this file
+      setPanes(currentPanes =>
+        currentPanes.map(pane => ({
+          ...pane,
+          tabs: pane.tabs.filter(t => t.path !== path),
+          activeTab: pane.activeTab === path
+            ? pane.tabs[pane.tabs.length - 2]?.path
+            : pane.activeTab
+        }))
+      );
       toast({
         title: "Success",
         description: "Item deleted successfully",
@@ -172,14 +237,37 @@ export const EditorContainer = () => {
     }
   };
 
-  const activeContent = openTabs.find(tab => tab.path === activeTab)?.content || '';
+  const handleSplitPane = () => {
+    const activePane = panes.find(p => p.id === activePaneId);
+    if (!activePane?.activeTab) return;
+
+    const newPaneId = `pane-${Date.now()}`;
+    const activeTab = activePane.tabs.find(t => t.path === activePane.activeTab);
+    if (!activeTab) return;
+
+    setPanes(currentPanes => [
+      ...currentPanes,
+      {
+        id: newPaneId,
+        tabs: [{ ...activeTab }],
+        activeTab: activeTab.path
+      }
+    ]);
+    setActivePaneId(newPaneId);
+  };
+
+  const handleClosePane = (paneId: string) => {
+    if (panes.length === 1) return;
+    setPanes(currentPanes => currentPanes.filter(p => p.id !== paneId));
+    setActivePaneId(panes[0].id);
+  };
 
   return (
     <div className="h-full flex">
       <ResizablePanelGroup direction="horizontal">
         <ResizablePanel defaultSize={20} minSize={15}>
           <FileTree
-            currentFile={activeTab}
+            currentFile={panes.find(p => p.id === activePaneId)?.activeTab}
             onFileSelect={handleFileSelect}
             onCreateFile={handleCreateFile}
             onCreateDirectory={handleCreateDirectory}
@@ -190,36 +278,76 @@ export const EditorContainer = () => {
         <ResizableHandle withHandle />
 
         <ResizablePanel defaultSize={80}>
-          <div className="h-full flex flex-col">
-            <TabsManager
-              tabs={openTabs.map(tab => ({
-                path: tab.path,
-                isDirty: tab.isDirty
-              }))}
-              activeTab={activeTab}
-              onTabSelect={setActiveTab}
-              onTabClose={handleTabClose}
-            />
-            
-            <div className="flex-1">
-              {isLoading ? (
-                <LoadingSpinner />
-              ) : activeTab ? (
-                <Suspense fallback={<LoadingSpinner />}>
-                  <MonacoEditor
-                    code={activeContent}
-                    onChange={handleCodeChange}
-                    showLineNumbers={true}
-                    wordWrap="on"
-                  />
-                </Suspense>
-              ) : (
-                <div className="h-full flex items-center justify-center text-muted-foreground">
-                  Select a file to edit
-                </div>
-              )}
-            </div>
-          </div>
+          <ResizablePanelGroup direction="horizontal">
+            {panes.map((pane, index) => (
+              <React.Fragment key={pane.id}>
+                {index > 0 && <ResizableHandle withHandle />}
+                <ResizablePanel>
+                  <div className="h-full flex flex-col" onClick={() => setActivePaneId(pane.id)}>
+                    <div className="border-b flex items-center">
+                      <TabsManager
+                        tabs={pane.tabs.map(tab => ({
+                          path: tab.path,
+                          isDirty: tab.isDirty
+                        }))}
+                        activeTab={pane.activeTab}
+                        onTabSelect={(path) => {
+                          setPanes(currentPanes =>
+                            currentPanes.map(p =>
+                              p.id === pane.id
+                                ? { ...p, activeTab: path }
+                                : p
+                            )
+                          );
+                        }}
+                        onTabClose={(path) => handleTabClose(pane.id, path)}
+                      />
+                      <div className="flex items-center border-l px-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleSplitPane()}
+                          className="h-8 w-8"
+                        >
+                          <SplitSquareHorizontal className="h-4 w-4" />
+                        </Button>
+                        {panes.length > 1 && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleClosePane(pane.id)}
+                            className="h-8 w-8"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <div className="flex-1">
+                      {isLoading ? (
+                        <LoadingSpinner />
+                      ) : pane.activeTab ? (
+                        <Suspense fallback={<LoadingSpinner />}>
+                          <MonacoEditor
+                            code={pane.tabs.find(t => t.path === pane.activeTab)?.content || ''}
+                            onChange={(value) => handleCodeChange(pane.id, value)}
+                            showLineNumbers={true}
+                            wordWrap="on"
+                            language={pane.activeTab}
+                          />
+                        </Suspense>
+                      ) : (
+                        <div className="h-full flex items-center justify-center text-muted-foreground">
+                          Select a file to edit
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </ResizablePanel>
+              </React.Fragment>
+            ))}
+          </ResizablePanelGroup>
         </ResizablePanel>
       </ResizablePanelGroup>
     </div>
