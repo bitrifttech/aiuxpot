@@ -4,7 +4,7 @@ import { EditorToolbar } from "./EditorToolbar";
 import { MonacoEditor } from "./MonacoEditor";
 import { Preview } from "./Preview";
 import { FilePane } from "./FilePane";
-import { memoryFS } from "@/utils/memoryFileSystem";
+import { fileApi } from "@/utils/fileApi";
 import type { editor } from "monaco-editor";
 import { TabsContent } from "@/components/ui/tabs";
 
@@ -21,12 +21,16 @@ function App() {
   const { toast } = useToast();
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
 
-  // Initialize the default file in memory if it doesn't exist
+  // Initialize the default file if it doesn't exist
   useEffect(() => {
-    if (!memoryFS.readFile(currentFileName)) {
-      memoryFS.writeFile(currentFileName, code);
-      console.log('Initialized default file in memory:', currentFileName);
-    }
+    const initializeDefaultFile = async () => {
+      const content = await fileApi.readFile(currentFileName);
+      if (!content) {
+        await fileApi.writeFile(currentFileName, code);
+        console.log('Initialized default file:', currentFileName);
+      }
+    };
+    initializeDefaultFile();
   }, []);
 
   const handleUndo = () => {
@@ -43,17 +47,17 @@ function App() {
     }
   };
 
-  const handleCodeChange = (value: string | undefined) => {
+  const handleCodeChange = async (value: string | undefined) => {
     if (value) {
       setCode(value);
-      memoryFS.writeFile(currentFileName, value);
-      console.log(`Code updated and stored in memory for file: ${currentFileName}`);
+      await fileApi.writeFile(currentFileName, value);
+      console.log(`Code updated for file: ${currentFileName}`);
     }
   };
 
-  const handleFileSelect = (fileName: string) => {
+  const handleFileSelect = async (fileName: string) => {
     console.log('File selected:', fileName);
-    const content = memoryFS.readFile(fileName);
+    const content = await fileApi.readFile(fileName);
     if (content) {
       setCurrentFileName(fileName);
       setCode(content);
