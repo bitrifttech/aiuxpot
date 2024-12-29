@@ -47,13 +47,17 @@ export const FilePane = ({ onFileSelect, currentFileName }: FilePaneProps) => {
   }, [currentFileName, onFileSelect]);
 
   const handleFileClick = (fileName: string) => {
-    onFileSelect(fileName);
+    // Remove leading slash if present
+    const normalizedPath = fileName.startsWith('/') ? fileName.slice(1) : fileName;
+    console.log('Handling file click with normalized path:', normalizedPath);
+    onFileSelect(normalizedPath);
   };
 
   const handleDeleteFile = (path: string) => {
-    memoryFS.deleteFile(path);
+    const normalizedPath = path.startsWith('/') ? path.slice(1) : path;
+    memoryFS.deleteFile(normalizedPath);
     setFiles(memoryFS.listFiles());
-    console.log('File deleted:', path);
+    console.log('File deleted:', normalizedPath);
   };
 
   const handleCreateFile = () => {
@@ -68,8 +72,10 @@ export const FilePane = ({ onFileSelect, currentFileName }: FilePaneProps) => {
 
     // Add .tsx extension if not provided
     const fileName = newFileName.endsWith('.tsx') ? newFileName : `${newFileName}.tsx`;
+    // Remove any leading slash
+    const normalizedFileName = fileName.startsWith('/') ? fileName.slice(1) : fileName;
 
-    if (memoryFS.readFile(fileName)) {
+    if (memoryFS.readFile(normalizedFileName)) {
       toast({
         title: "Error",
         description: "A file with this name already exists",
@@ -78,11 +84,11 @@ export const FilePane = ({ onFileSelect, currentFileName }: FilePaneProps) => {
       return;
     }
 
-    memoryFS.writeFile(fileName, `// ${fileName}\n\nexport default function ${newFileName.split('.')[0]}() {\n  return (\n    <div>\n      New Component\n    </div>\n  );\n}`);
+    memoryFS.writeFile(normalizedFileName, `// ${normalizedFileName}\n\nexport default function ${newFileName.split('.')[0]}() {\n  return (\n    <div>\n      New Component\n    </div>\n  );\n}`);
     setFiles(memoryFS.listFiles());
     setNewFileName("");
     setIsNewFileDialogOpen(false);
-    onFileSelect(fileName);
+    onFileSelect(normalizedFileName);
     
     toast({
       title: "Success",
