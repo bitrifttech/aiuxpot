@@ -13,7 +13,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 export function DarkModeToggle() {
-  const { setTheme } = useTheme();
+  const { theme, setTheme } = useTheme();
+
+  React.useEffect(() => {
+    console.log("Current theme:", theme); // Debug log
+  }, [theme]);
 
   return (
     <DropdownMenu>
