@@ -13,18 +13,16 @@ export const EditorContainer = () => {
   const handleFileSelect = async (fileName: string) => {
     console.log('File selected:', fileName);
     const content = await fileApi.readFile(fileName);
-    if (content) {
-      setCurrentFileName(fileName);
-      setCode(content);
-      console.log('File content loaded into editor:', fileName);
-    } else {
-      console.error('No content found for file:', fileName);
-      toast({
-        title: "Error",
-        description: `Could not load content for file: ${fileName}`,
-        variant: "destructive",
-      });
+    
+    // If content is null, it might be a directory
+    if (content === null) {
+      // Don't clear the editor state for directories
+      return;
     }
+
+    setCurrentFileName(fileName);
+    setCode(content);
+    console.log('File content loaded into editor:', fileName);
   };
 
   const handleCodeChange = async (value: string | undefined) => {
@@ -89,39 +87,47 @@ export const EditorContainer = () => {
               <h2 className="text-sm font-semibold">
                 {currentFileName || 'No file selected'}
               </h2>
-              <div className="space-x-2">
-                <button
-                  onClick={handleCopyCode}
-                  className="px-2 py-1 text-xs bg-secondary text-secondary-foreground rounded hover:bg-secondary/90"
-                >
-                  Copy
-                </button>
-                <button
-                  onClick={handleDownloadCode}
-                  className="px-2 py-1 text-xs bg-primary text-primary-foreground rounded hover:bg-primary/90"
-                >
-                  Download
-                </button>
-              </div>
+              {currentFileName && (
+                <div className="space-x-2">
+                  <button
+                    onClick={handleCopyCode}
+                    className="px-2 py-1 text-xs bg-secondary text-secondary-foreground rounded hover:bg-secondary/90"
+                  >
+                    Copy
+                  </button>
+                  <button
+                    onClick={handleDownloadCode}
+                    className="px-2 py-1 text-xs bg-primary text-primary-foreground rounded hover:bg-primary/90"
+                  >
+                    Download
+                  </button>
+                </div>
+              )}
             </div>
             <div className="flex-1">
-              <Editor
-                height="100%"
-                defaultLanguage="typescript"
-                language="typescript"
-                theme="vs-dark"
-                value={code}
-                onChange={handleCodeChange}
-                options={{
-                  minimap: { enabled: false },
-                  fontSize: 14,
-                  lineNumbers: 'on',
-                  roundedSelection: false,
-                  scrollBeyondLastLine: false,
-                  readOnly: !currentFileName,
-                  automaticLayout: true,
-                }}
-              />
+              {currentFileName ? (
+                <Editor
+                  height="100%"
+                  defaultLanguage="typescript"
+                  language="typescript"
+                  theme="vs-dark"
+                  value={code}
+                  onChange={handleCodeChange}
+                  options={{
+                    minimap: { enabled: false },
+                    fontSize: 14,
+                    lineNumbers: 'on',
+                    roundedSelection: false,
+                    scrollBeyondLastLine: false,
+                    readOnly: false,
+                    automaticLayout: true,
+                  }}
+                />
+              ) : (
+                <div className="h-full flex items-center justify-center text-muted-foreground">
+                  <p>Select a file to edit</p>
+                </div>
+              )}
             </div>
           </div>
         </div>

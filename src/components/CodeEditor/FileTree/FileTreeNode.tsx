@@ -1,6 +1,7 @@
-import { File, FolderOpen, Trash2, ChevronRight, ChevronDown } from "lucide-react";
+import { File, FolderOpen, Folder, Trash2, ChevronRight, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { FileTreeNodeType } from "./types";
+import { cn } from "@/lib/utils";
 
 interface FileTreeNodeProps {
   node: FileTreeNodeType;
@@ -21,9 +22,17 @@ export const FileTreeNode = ({
   onDeleteFile,
   onToggleFolder,
 }: FileTreeNodeProps) => {
+  const isExpanded = expandedFolders.has(node.path);
+  const indent = level * 12;
+
   const handleFileClick = () => {
     console.log('FileTreeNode: Handling file click:', node.path);
     onFileSelect(node.path);
+  };
+
+  const handleFolderClick = () => {
+    console.log('FileTreeNode: Handling folder click:', node.path);
+    onToggleFolder(node.path);
   };
 
   const handleDeleteClick = (e: React.MouseEvent) => {
@@ -33,25 +42,43 @@ export const FileTreeNode = ({
 
   if (node.type === 'directory') {
     return (
-      <div key={node.path}>
-        <div className="group flex items-center">
+      <div>
+        <div
+          className={cn(
+            "group flex items-center hover:bg-accent rounded-md",
+            isExpanded && "bg-accent/50"
+          )}
+        >
           <Button
             variant="ghost"
             size="sm"
             className="w-full justify-start gap-2 px-2"
-            onClick={() => onToggleFolder(node.path)}
+            onClick={handleFolderClick}
           >
-            {expandedFolders.has(node.path) ? (
-              <ChevronDown className="h-4 w-4" />
+            <span style={{ width: indent }} />
+            {isExpanded ? (
+              <ChevronDown className="h-4 w-4 shrink-0" />
             ) : (
-              <ChevronRight className="h-4 w-4" />
+              <ChevronRight className="h-4 w-4 shrink-0" />
             )}
-            <FolderOpen className="h-4 w-4" />
+            {isExpanded ? (
+              <FolderOpen className="h-4 w-4 shrink-0" />
+            ) : (
+              <Folder className="h-4 w-4 shrink-0" />
+            )}
             <span className="truncate">{node.name}</span>
           </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 opacity-0 group-hover:opacity-100"
+            onClick={handleDeleteClick}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
         </div>
-        {expandedFolders.has(node.path) && node.children && (
-          <div className="pl-2">
+        {isExpanded && node.children && (
+          <div className="pl-4">
             {node.children.map((child) => (
               <FileTreeNode
                 key={child.path}
@@ -72,10 +99,10 @@ export const FileTreeNode = ({
 
   return (
     <div
-      className={`group flex items-center justify-between p-2 rounded-md hover:bg-accent text-sm ${
-        currentFileName === node.path ? 'bg-accent' : ''
-      }`}
-      style={{ paddingLeft: `${level * 12}px` }}
+      className={cn(
+        "group flex items-center hover:bg-accent rounded-md",
+        currentFileName === node.path && "bg-accent"
+      )}
     >
       <Button
         variant="ghost"
@@ -83,7 +110,8 @@ export const FileTreeNode = ({
         className="w-full justify-start gap-2 px-2"
         onClick={handleFileClick}
       >
-        <File className="h-4 w-4" />
+        <span style={{ width: indent }} />
+        <File className="h-4 w-4 shrink-0" />
         <span className="truncate">{node.name}</span>
       </Button>
       <Button

@@ -1,13 +1,14 @@
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
+import { Plus, FolderPlus } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@/components/ui/use-toast";
 import { FileTreeNode } from "./FileTree/FileTreeNode";
 import { buildFileTree } from "./FileTree/utils";
 import { fileApi } from "@/utils/fileApi";
+import { FileTreeNodeType } from "./FileTree/types";
 
 interface FilePaneProps {
   onFileSelect: (fileName: string) => void;
@@ -27,9 +28,26 @@ export const FilePane = ({ onFileSelect, currentFileName }: FilePaneProps) => {
     setFiles(filesList);
     
     if (filesList.length > 0 && !currentFileName) {
-      const firstFile = filesList[0];
-      console.log('Auto-selecting initial file:', firstFile);
-      onFileSelect(firstFile);
+      // Find the first file (not directory) to select
+      const fileTree = buildFileTree(filesList);
+      const findFirstFile = (nodes: FileTreeNodeType[]): string | undefined => {
+        for (const node of nodes) {
+          if (node.type === 'file') {
+            return node.path;
+          }
+          if (node.children?.length) {
+            const found = findFirstFile(node.children);
+            if (found) return found;
+          }
+        }
+        return undefined;
+      };
+      
+      const firstFile = findFirstFile(fileTree);
+      if (firstFile) {
+        console.log('Auto-selecting initial file:', firstFile);
+        onFileSelect(firstFile);
+      }
     }
   };
 
@@ -77,7 +95,27 @@ export const FilePane = ({ onFileSelect, currentFileName }: FilePaneProps) => {
     }
   };
 
-  const toggleFolder = (path: string) => {
+  const handleInitProject = async () => {
+    try {
+      const response = await fetch('/api/init', { method: 'POST' });
+      if (!response.ok) {
+        throw new Error('Failed to initialize project');
+      }
+      await updateFiles();
+      toast({
+        title: "Success",
+        description: "Project initialized successfully",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to initialize project",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleToggleFolder = (path: string) => {
     setExpandedFolders(prev => {
       const next = new Set(prev);
       if (next.has(path)) {
@@ -96,34 +134,45 @@ export const FilePane = ({ onFileSelect, currentFileName }: FilePaneProps) => {
       <div className="p-2 border-b">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold">Files</h2>
-          <Dialog open={isNewFileDialogOpen} onOpenChange={setIsNewFileDialogOpen}>
-            <DialogTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8">
-                <Plus className="h-4 w-4" />
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Create New File</DialogTitle>
-              </DialogHeader>
-              <form onSubmit={(e) => { e.preventDefault(); handleCreateFile(); }} className="space-y-4">
-                <div>
-                  <label htmlFor="fileName" className="text-sm font-medium">
-                    File Name
-                  </label>
-                  <Input
-                    id="fileName"
-                    value={newFileName}
-                    onChange={(e) => setNewFileName(e.target.value)}
-                    placeholder="Enter file name (e.g., MyComponent.tsx)"
-                  />
-                </div>
-                <Button type="submit" className="w-full">
-                  Create File
+          <div className="flex items-center space-x-1">
+            <Dialog open={isNewFileDialogOpen} onOpenChange={setIsNewFileDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8">
+                  <Plus className="h-4 w-4" />
                 </Button>
-              </form>
-            </DialogContent>
-          </Dialog>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Create New File</DialogTitle>
+                </DialogHeader>
+                <form onSubmit={(e) => { e.preventDefault(); handleCreateFile(); }} className="space-y-4">
+                  <div>
+                    <label htmlFor="fileName" className="text-sm font-medium">
+                      File Name
+                    </label>
+                    <Input
+                      id="fileName"
+                      value={newFileName}
+                      onChange={(e) => setNewFileName(e.target.value)}
+                      placeholder="Enter file name (e.g., MyComponent.tsx)"
+                    />
+                  </div>
+                  <Button type="submit" className="w-full">
+                    Create File
+                  </Button>
+                </form>
+              </DialogContent>
+            </Dialog>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={handleInitProject}
+              title="Initialize New Project"
+            >
+              <FolderPlus className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </div>
       <ScrollArea className="h-[calc(100%-40px)]">
@@ -137,7 +186,7 @@ export const FilePane = ({ onFileSelect, currentFileName }: FilePaneProps) => {
               expandedFolders={expandedFolders}
               onFileSelect={onFileSelect}
               onDeleteFile={handleDeleteFile}
-              onToggleFolder={toggleFolder}
+              onToggleFolder={handleToggleFolder}
             />
           ))}
         </div>
