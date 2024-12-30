@@ -3,6 +3,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { previewApi } from '@/utils/previewApi';
 
 interface PreviewFrameProps {
+  projectId: string;
   filePath: string;
   content: string;
 }
@@ -13,7 +14,7 @@ interface FileResources {
   js: string[];
 }
 
-export const PreviewFrame = ({ filePath, content }: PreviewFrameProps) => {
+export const PreviewFrame = ({ projectId, filePath, content }: PreviewFrameProps) => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [resources, setResources] = useState<FileResources>({
@@ -23,12 +24,18 @@ export const PreviewFrame = ({ filePath, content }: PreviewFrameProps) => {
   });
   const { toast } = useToast();
 
+  // Set current project
+  useEffect(() => {
+    console.log('Setting current project:', projectId);
+    previewApi.setCurrentProject(projectId);
+  }, [projectId]);
+
   // Track related files
   useEffect(() => {
     const fileExt = filePath.split('.').pop()?.toLowerCase();
     if (!fileExt) return;
 
-    console.log('Current file:', filePath, 'Extension:', fileExt);
+    console.log('Current file:', { projectId, filePath, fileExt });
 
     setResources(prev => {
       const newResources = { ...prev };
@@ -41,18 +48,24 @@ export const PreviewFrame = ({ filePath, content }: PreviewFrameProps) => {
       if (fileExt === 'html' || fileExt === 'css' || fileExt === 'js') {
         newResources[fileExt] = [filePath];
       }
-      console.log('Updated resources:', newResources);
+      console.log('Updated resources:', { projectId, resources: newResources });
       return newResources;
     });
-  }, [filePath]);
+  }, [projectId, filePath]);
 
   // Listen for file updates
   useEffect(() => {
-    const handleFileChange = async ({ path, content: newContent }: { path: string, content: string }) => {
+    const handleFileChange = async ({ projectId: changedProjectId, path, content: newContent }: { projectId: string, path: string, content: string }) => {
+      // Only handle updates for current project
+      if (changedProjectId !== projectId) {
+        console.log('Ignoring file change from different project:', { changedProjectId, currentProject: projectId });
+        return;
+      }
+
       const ext = path.split('.').pop()?.toLowerCase();
       if (!ext || !['html', 'css', 'js'].includes(ext)) return;
 
-      console.log('File changed:', path, 'Extension:', ext);
+      console.log('File changed:', { projectId, path, ext });
 
       // Update the resources to trigger a preview update
       setResources(prev => {
@@ -61,20 +74,20 @@ export const PreviewFrame = ({ filePath, content }: PreviewFrameProps) => {
         if (!newResources[fileType].includes(path)) {
           newResources[fileType] = [...newResources[fileType], path];
         }
-        console.log('Updated resources after change:', newResources);
+        console.log('Updated resources after change:', { projectId, resources: newResources });
         return newResources;
       });
     };
 
     previewApi.addEventListener('fileChanged', handleFileChange);
     return () => previewApi.removeEventListener('fileChanged', handleFileChange);
-  }, []);
+  }, [projectId]);
 
   const injectCSS = async (doc: Document): Promise<void> => {
-    console.log('Injecting CSS files:', resources.css);
+    console.log('Injecting CSS files:', { projectId, files: resources.css });
     for (const cssPath of resources.css) {
       try {
-        console.log('Loading CSS from:', cssPath);
+        console.log('Loading CSS from:', { projectId, path: cssPath });
         const cssContent = await previewApi.getFile(cssPath);
         console.log('CSS content:', cssContent);
         
@@ -91,35 +104,35 @@ export const PreviewFrame = ({ filePath, content }: PreviewFrameProps) => {
         
         // Add load event listener
         link.onload = () => {
-          console.log('CSS loaded successfully:', cssPath);
+          console.log('CSS loaded successfully:', { projectId, path: cssPath });
           URL.revokeObjectURL(cssUrl);
         };
         
         link.onerror = (e) => {
-          console.error('Error loading CSS:', cssPath, e);
+          console.error('Error loading CSS:', { projectId, path: cssPath, error: e });
         };
         
         doc.head.appendChild(link);
       } catch (error) {
-        console.error('Error injecting CSS:', cssPath, error);
+        console.error('Error injecting CSS:', { projectId, path: cssPath, error });
       }
     }
   };
 
   const injectJS = async (doc: Document): Promise<void> => {
-    console.log('Injecting JS files:', resources.js);
+    console.log('Injecting JS files:', { projectId, files: resources.js });
     for (const jsPath of resources.js) {
       try {
-        console.log('Loading JS from:', jsPath);
+        console.log('Loading JS from:', { projectId, path: jsPath });
         const jsContent = await previewApi.getFile(jsPath);
         console.log('JS content:', jsContent.substring(0, 100) + '...');
         const script = doc.createElement('script');
         script.text = jsContent;
         script.setAttribute('data-path', jsPath);
         doc.body.appendChild(script);
-        console.log('JS injected successfully');
+        console.log('JS injected successfully:', { projectId, path: jsPath });
       } catch (error) {
-        console.error('Error loading JavaScript:', jsPath, error);
+        console.error('Error loading JavaScript:', { projectId, path: jsPath, error });
       }
     }
   };
@@ -139,7 +152,7 @@ export const PreviewFrame = ({ filePath, content }: PreviewFrameProps) => {
       }
 
       setIsLoading(true);
-      console.log('Starting preview update with resources:', resources);
+      console.log('Starting preview update:', { projectId, resources });
 
       // Start with a clean document
       doc.open();
@@ -152,7 +165,7 @@ export const PreviewFrame = ({ filePath, content }: PreviewFrameProps) => {
       // Then, add HTML content
       if (resources.html.length > 0) {
         try {
-          console.log('Loading HTML from:', resources.html[0]);
+          console.log('Loading HTML from:', { projectId, path: resources.html[0] });
           const htmlContent = await previewApi.getFile(resources.html[0]);
           console.log('HTML content:', htmlContent.substring(0, 100) + '...');
           
@@ -170,7 +183,7 @@ export const PreviewFrame = ({ filePath, content }: PreviewFrameProps) => {
             console.log('Head content injected');
           }
         } catch (error) {
-          console.error('Error loading HTML:', error);
+          console.error('Error loading HTML:', { projectId, error });
         }
       }
 
@@ -204,9 +217,9 @@ export const PreviewFrame = ({ filePath, content }: PreviewFrameProps) => {
       await injectJS(doc);
 
       doc.close();
-      console.log('Preview update completed');
+      console.log('Preview update completed for project:', projectId);
     } catch (error) {
-      console.error('Error updating preview:', error);
+      console.error('Error updating preview:', { projectId, error });
       toast({
         title: 'Preview Error',
         description: 'Failed to update preview',
@@ -219,15 +232,15 @@ export const PreviewFrame = ({ filePath, content }: PreviewFrameProps) => {
 
   // Update preview when content or resources change
   useEffect(() => {
-    console.log('Content or resources changed, updating preview');
+    console.log('Content or resources changed, updating preview:', { projectId });
     updatePreview();
-  }, [content, resources]);
+  }, [projectId, content, resources]);
 
   // Handle preview messages
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       if (event.data.type === 'error') {
-        console.error('Preview frame error:', event.data);
+        console.error('Preview frame error:', { projectId, error: event.data });
         toast({
           title: 'Preview Error',
           description: event.data.message,
@@ -238,7 +251,7 @@ export const PreviewFrame = ({ filePath, content }: PreviewFrameProps) => {
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [toast]);
+  }, [projectId, toast]);
 
   return (
     <div className="w-full h-full relative">

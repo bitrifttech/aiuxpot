@@ -16,7 +16,7 @@ interface FilePaneProps {
 }
 
 export const FilePane = ({ onFileSelect, currentFileName }: FilePaneProps) => {
-  const [files, setFiles] = useState<string[]>([]);
+  const [files, setFiles] = useState<Array<{ path: string; type: string }>>([]);
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(['/']));
   const [isNewFileDialogOpen, setIsNewFileDialogOpen] = useState(false);
   const [newFileName, setNewFileName] = useState("");
@@ -102,19 +102,17 @@ export const FilePane = ({ onFileSelect, currentFileName }: FilePaneProps) => {
 
   const handleInitProject = async () => {
     try {
-      const response = await fetch('/api/init', { method: 'POST' });
-      if (!response.ok) {
-        throw new Error('Failed to initialize project');
-      }
+      await fileApi.initProject();
       await updateFiles();
       toast({
         title: "Success",
         description: "Project initialized successfully",
       });
     } catch (error) {
+      console.error('Error initializing project:', error);
       toast({
         title: "Error",
-        description: "Failed to initialize project",
+        description: error instanceof Error ? error.message : "Failed to initialize project",
         variant: "destructive",
       });
     }

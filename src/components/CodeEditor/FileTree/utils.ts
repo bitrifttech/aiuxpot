@@ -4,12 +4,20 @@ interface FileTreeMap {
   [key: string]: FileTreeNodeType;
 }
 
-export const buildFileTree = (files: string[]): FileTreeNodeType[] => {
+interface FileEntry {
+  path: string;
+  type: string;
+}
+
+export const buildFileTree = (files: (string | FileEntry)[]): FileTreeNodeType[] => {
   console.log('Building file tree with files:', files);
   const root: FileTreeMap = {};
 
   // First pass: create all directories and files
-  files.forEach(filePath => {
+  files.forEach(file => {
+    // Handle both string and object formats
+    const filePath = typeof file === 'string' ? file : file.path;
+    
     // Normalize path to use forward slashes
     const normalizedPath = filePath.replace(/\\/g, '/');
     const parts = normalizedPath.split('/').filter(Boolean);
@@ -43,7 +51,8 @@ export const buildFileTree = (files: string[]): FileTreeNodeType[] => {
   const tree: FileTreeNodeType[] = [];
   const addedPaths = new Set<string>();
 
-  files.forEach(filePath => {
+  files.forEach(file => {
+    const filePath = typeof file === 'string' ? file : file.path;
     // Normalize path to use forward slashes
     const normalizedPath = filePath.replace(/\\/g, '/');
     const parts = normalizedPath.split('/').filter(Boolean);

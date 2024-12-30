@@ -12,16 +12,17 @@ import { Textarea } from "./ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 
 interface CreateProjectDialogProps {
-  onCreateProject: (title: string, description: string) => void;
+  onCreateProject: (title: string, description: string) => Promise<void>;
 }
 
 export function CreateProjectDialog({ onCreateProject }: CreateProjectDialogProps) {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [isCreating, setIsCreating] = useState(false);
   const { toast } = useToast();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) {
       toast({
@@ -31,14 +32,27 @@ export function CreateProjectDialog({ onCreateProject }: CreateProjectDialogProp
       });
       return;
     }
-    onCreateProject(title, description);
-    setTitle("");
-    setDescription("");
-    setOpen(false);
-    toast({
-      title: "Success",
-      description: "Project created successfully",
-    });
+
+    setIsCreating(true);
+    try {
+      await onCreateProject(title, description);
+      setTitle("");
+      setDescription("");
+      setOpen(false);
+      toast({
+        title: "Success",
+        description: "Project created successfully",
+      });
+    } catch (error) {
+      console.error('Error creating project:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create project. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCreating(false);
+    }
   };
 
   return (
@@ -62,6 +76,7 @@ export function CreateProjectDialog({ onCreateProject }: CreateProjectDialogProp
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Enter project title"
+              disabled={isCreating}
             />
           </div>
           <div>
@@ -73,10 +88,11 @@ export function CreateProjectDialog({ onCreateProject }: CreateProjectDialogProp
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Enter project description"
+              disabled={isCreating}
             />
           </div>
-          <Button type="submit" className="w-full">
-            Create Project
+          <Button type="submit" className="w-full" disabled={isCreating}>
+            {isCreating ? "Creating..." : "Create Project"}
           </Button>
         </form>
       </DialogContent>

@@ -1,141 +1,208 @@
 import express from 'express';
-import { Server as WebSocketServer } from 'ws';
-import { VirtualFileSystem } from './virtualFs';
+import { WebSocket, WebSocketServer } from 'ws';
 import cors from 'cors';
-import path from 'path';
+import { VirtualFileSystem } from './virtualFs';
+
+interface WebSocketMessage {
+  type: string;
+  data: any;
+}
+
+interface FileUpdate {
+  projectId: string;
+  path: string;
+  content: string;
+  type: string;
+}
 
 export class FileServer {
-  private app: express.Application;
-  private vfs: VirtualFileSystem;
+  private app: express.Express;
   private wss: WebSocketServer;
-  private connectedClients: Set<WebSocket>;
+  private vfs: VirtualFileSystem;
+  private clients: Set<WebSocket>;
 
   constructor() {
+    console.log('Initializing FileServer');
     this.app = express();
     this.vfs = new VirtualFileSystem();
-    this.connectedClients = new Set();
-    
-    // Setup middleware
-    this.app.use(cors());
-    this.app.use(express.json());
+    this.clients = new Set();
 
-    // Setup routes
+    // Configure Express
+    this.app.use(cors());
+    this.app.use(express.json({ limit: '50mb' }));
     this.setupRoutes();
+
+    // Create WebSocket server
+    this.wss = new WebSocketServer({ port: 3003 }); // Use port 3003 for WebSocket
+    this.setupWebSocket();
+    console.log('FileServer initialized');
   }
 
   private setupRoutes(): void {
-    // Get file content
-    this.app.get('/files/*', (req, res) => {
-      const filePath = req.params[0];
-      const file = this.vfs.getFile(filePath);
+    console.log('Setting up routes');
 
-      if (!file) {
-        console.error('File not found:', filePath);
-        res.status(404).send('File not found');
-        return;
+    // Project routes
+    this.app.post('/projects', (req, res) => {
+      console.log('Creating project:', req.body);
+      try {
+        const { name } = req.body;
+        const projectId = this.vfs.createProject(name);
+        console.log('Project created successfully:', { projectId, name });
+        res.json({ projectId });
+      } catch (error) {
+        console.error('Error creating project:', error);
+        res.status(500).json({ error: 'Failed to create project' });
       }
-
-      const contentType = this.vfs.getContentType(filePath);
-      console.log('Serving file:', filePath, 'Content-Type:', contentType);
-      
-      res.setHeader('Content-Type', contentType);
-      res.setHeader('Cache-Control', 'no-cache');
-      res.setHeader('Access-Control-Allow-Origin', '*');
-      res.send(file.content);
     });
 
-    // Update file
-    this.app.post('/files/*', (req, res) => {
-      const filePath = req.params[0];
+    this.app.get('/projects', (req, res) => {
+      console.log('Listing projects');
+      try {
+        const projects = this.vfs.listProjects();
+        console.log('Projects retrieved:', projects);
+        res.json(projects);
+      } catch (error) {
+        console.error('Error listing projects:', error);
+        res.status(500).json({ error: 'Failed to list projects' });
+      }
+    });
+
+    this.app.delete('/projects/:projectId', (req, res) => {
+      const { projectId } = req.params;
+      console.log('Deleting project:', projectId);
+      try {
+        const deleted = this.vfs.deleteProject(projectId);
+        if (deleted) {
+          console.log('Project deleted successfully:', projectId);
+          res.sendStatus(200);
+        } else {
+          console.log('Project not found for deletion:', projectId);
+          res.sendStatus(404);
+        }
+      } catch (error) {
+        console.error('Error deleting project:', { projectId, error });
+        res.status(500).json({ error: 'Failed to delete project' });
+      }
+    });
+
+    // File routes
+    this.app.get('/projects/:projectId/files', (req, res) => {
+      const { projectId } = req.params;
+      console.log('Listing files for project:', projectId);
+      try {
+        const files = this.vfs.listFiles(projectId);
+        console.log('Files retrieved:', { projectId, fileCount: files.length });
+        res.json(files);
+      } catch (error) {
+        console.error('Error listing files:', { projectId, error });
+        res.status(500).json({ error: 'Failed to list files' });
+      }
+    });
+
+    this.app.get('/projects/:projectId/files/:filePath(*)', (req, res) => {
+      const { projectId, filePath } = req.params;
+      console.log('Getting file:', { projectId, filePath });
+      try {
+        const file = this.vfs.getFile(projectId, filePath);
+        if (file) {
+          const contentType = this.vfs.getContentType(filePath);
+          res.type(contentType).send(file.content);
+          console.log('File sent successfully:', { projectId, filePath, contentType });
+        } else {
+          console.log('File not found:', { projectId, filePath });
+          res.sendStatus(404);
+        }
+      } catch (error) {
+        console.error('Error getting file:', { projectId, filePath, error });
+        res.status(500).json({ error: 'Failed to get file' });
+      }
+    });
+
+    this.app.post('/projects/:projectId/files/:filePath(*)', (req, res) => {
+      const { projectId, filePath } = req.params;
       const { content, type } = req.body;
-
-      this.vfs.setFile(filePath, content, type);
-
-      // Notify all clients about the file change
-      const message = JSON.stringify({
-        type: 'fileChanged',
-        data: { path: filePath, content, type }
-      });
-      
-      this.connectedClients.forEach(client => {
-        if (client.readyState === WebSocket.OPEN) {
-          client.send(message);
-        }
-      });
-
-      res.status(200).send('File updated');
+      console.log('Setting file:', { projectId, filePath, type, contentLength: content.length });
+      try {
+        this.vfs.setFile(projectId, filePath, content, type);
+        console.log('File set successfully:', { projectId, filePath });
+        res.sendStatus(200);
+      } catch (error) {
+        console.error('Error setting file:', { projectId, filePath, error });
+        res.status(500).json({ error: 'Failed to set file' });
+      }
     });
 
-    // Delete file
-    this.app.delete('/files/*', (req, res) => {
-      const filePath = req.params[0];
-      this.vfs.deleteFile(filePath);
-
-      // Notify all clients about the file deletion
-      const message = JSON.stringify({
-        type: 'fileDeleted',
-        data: { path: filePath }
-      });
-      
-      this.connectedClients.forEach(client => {
-        if (client.readyState === WebSocket.OPEN) {
-          client.send(message);
-        }
-      });
-
-      res.status(200).send('File deleted');
-    });
-
-    // List files
-    this.app.get('/files', (_, res) => {
-      res.json(this.vfs.listFiles());
+    this.app.delete('/projects/:projectId/files/:filePath(*)', (req, res) => {
+      const { projectId, filePath } = req.params;
+      console.log('Deleting file:', { projectId, filePath });
+      try {
+        this.vfs.deleteFile(projectId, filePath);
+        console.log('File deleted successfully:', { projectId, filePath });
+        res.sendStatus(200);
+      } catch (error) {
+        console.error('Error deleting file:', { projectId, filePath, error });
+        res.status(500).json({ error: 'Failed to delete file' });
+      }
     });
   }
 
-  setupWebSocket(server: any): void {
-    this.wss = new WebSocketServer({ server });
-
-    this.wss.on('connection', (ws) => {
-      console.log('Client connected');
-      this.connectedClients.add(ws);
-
-      // Send initial file list
-      ws.send(JSON.stringify({
-        type: 'fileList',
-        data: this.vfs.listFiles()
-      }));
-
-      // Handle file changes
-      this.vfs.on('fileChanged', ({ path, content, type }) => {
-        ws.send(JSON.stringify({
-          type: 'fileChanged',
-          data: { path, content, type }
-        }));
-      });
-
-      this.vfs.on('fileDeleted', ({ path }) => {
-        ws.send(JSON.stringify({
-          type: 'fileDeleted',
-          data: { path }
-        }));
-      });
+  private setupWebSocket(): void {
+    console.log('Setting up WebSocket server on port 3003');
+    this.wss.on('connection', (ws: WebSocket) => {
+      console.log('New WebSocket connection established');
+      this.clients.add(ws);
 
       ws.on('close', () => {
-        console.log('Client disconnected');
-        this.connectedClients.delete(ws);
+        console.log('WebSocket connection closed');
+        this.clients.delete(ws);
+      });
+
+      ws.on('error', (error) => {
+        console.error('WebSocket error:', error);
       });
     });
-  }
 
-  start(port: number): void {
-    const server = this.app.listen(port, () => {
-      console.log(`File server running on port ${port}`);
+    // Listen for file system events
+    this.vfs.on('fileChanged', (data: FileUpdate) => {
+      console.log('Broadcasting file change:', { 
+        projectId: data.projectId,
+        path: data.path,
+        type: data.type,
+        contentLength: data.content.length 
+      });
+      this.broadcast({ type: 'fileChanged', data });
     });
 
-    this.setupWebSocket(server);
+    this.vfs.on('fileDeleted', (data: { projectId: string, path: string }) => {
+      console.log('Broadcasting file deletion:', data);
+      this.broadcast({ type: 'fileDeleted', data });
+    });
+
+    this.vfs.on('projectDeleted', (data: { projectId: string }) => {
+      console.log('Broadcasting project deletion:', data);
+      this.broadcast({ type: 'projectDeleted', data });
+    });
   }
 
-  getVirtualFileSystem(): VirtualFileSystem {
-    return this.vfs;
+  private broadcast(message: WebSocketMessage): void {
+    const messageStr = JSON.stringify(message);
+    console.log('Broadcasting message:', { 
+      type: message.type, 
+      dataType: typeof message.data,
+      clientCount: this.clients.size 
+    });
+    
+    this.clients.forEach(client => {
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(messageStr);
+      }
+    });
+  }
+
+  listen(port: number): void {
+    console.log(`Starting server on port ${port}`);
+    this.app.listen(port, () => {
+      console.log(`Server is running on port ${port}`);
+    });
   }
 }

@@ -1,13 +1,14 @@
 import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { Project } from '@/types/project';
+import { previewApi } from '@/utils/previewApi';
 
 interface ProjectContextType {
   projects: Project[];
   currentProject: Project | null;
   setProjects: (projects: Project[]) => void;
   setCurrentProject: (project: Project | null) => void;
-  addProject: (title: string, description: string) => void;
-  deleteProject: (id: string) => void;
+  addProject: (title: string, description: string) => Promise<Project>;
+  deleteProject: (id: string) => Promise<void>;
 }
 
 const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
@@ -40,6 +41,34 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     return null;
   });
 
+  // Load projects from backend on mount
+  useEffect(() => {
+    const loadProjects = async () => {
+      try {
+        const backendProjects = await previewApi.listProjects();
+        const updatedProjects = backendProjects.map(bp => ({
+          id: bp.id,
+          title: bp.name,
+          description: '',
+          createdAt: new Date().toISOString(),
+        }));
+        setProjects(updatedProjects);
+
+        // Update current project if it exists in backend
+        if (currentProject) {
+          const exists = backendProjects.some(bp => bp.id === currentProject.id);
+          if (!exists) {
+            setCurrentProject(null);
+          }
+        }
+      } catch (error) {
+        console.error('Error loading projects from backend:', error);
+      }
+    };
+
+    loadProjects();
+  }, []);
+
   // Save projects to localStorage
   useEffect(() => {
     try {
@@ -49,11 +78,12 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     }
   }, [projects]);
 
-  // Save current project to localStorage
+  // Save current project to localStorage and update preview API
   useEffect(() => {
     try {
       if (currentProject) {
         localStorage.setItem(CURRENT_PROJECT_KEY, JSON.stringify(currentProject));
+        previewApi.setCurrentProject(currentProject.id);
       } else {
         localStorage.removeItem(CURRENT_PROJECT_KEY);
       }
@@ -62,21 +92,41 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     }
   }, [currentProject]);
 
-  const addProject = (title: string, description: string) => {
-    const newProject: Project = {
-      id: crypto.randomUUID(),
-      title,
-      description,
-      createdAt: new Date().toISOString(),
-    };
-    setProjects((prev) => [...prev, newProject]);
-    setCurrentProject(newProject);
+  const addProject = async (title: string, description: string) => {
+    try {
+      // Create project in backend first
+      const projectId = await previewApi.createProject(title);
+      
+      const newProject: Project = {
+        id: projectId,
+        title,
+        description,
+        createdAt: new Date().toISOString(),
+      };
+      
+      setProjects(prev => [...prev, newProject]);
+      // Set the new project as the current project
+      setCurrentProject(newProject);
+      
+      return newProject;
+    } catch (error) {
+      console.error('Error creating project:', error);
+      throw error;
+    }
   };
 
-  const deleteProject = (id: string) => {
-    setProjects((prev) => prev.filter((project) => project.id !== id));
-    if (currentProject?.id === id) {
-      setCurrentProject(null);
+  const deleteProject = async (id: string) => {
+    try {
+      // Delete from backend first
+      await previewApi.deleteProject(id);
+      
+      setProjects(prev => prev.filter(project => project.id !== id));
+      if (currentProject?.id === id) {
+        setCurrentProject(null);
+      }
+    } catch (error) {
+      console.error('Error deleting project:', error);
+      throw error;
     }
   };
 
