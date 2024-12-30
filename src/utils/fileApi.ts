@@ -129,6 +129,11 @@ class FileApi {
       // Remove from cache
       this.cache.delete(path);
       this.saveCache();
+
+      // Dispatch file deleted event
+      window.dispatchEvent(new CustomEvent('file-deleted', { 
+        detail: { path } 
+      }));
       
       return true;
     } catch (error) {

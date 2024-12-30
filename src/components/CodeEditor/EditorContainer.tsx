@@ -205,6 +205,26 @@ describe('Example Test', () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [activePaneId, panes, debouncedSave]);
 
+  useEffect(() => {
+    const handleFileDeleted = (event: CustomEvent<{ path: string }>) => {
+      // Close any tabs for the deleted file
+      setPanes(currentPanes =>
+        currentPanes.map(pane => ({
+          ...pane,
+          tabs: pane.tabs.filter(tab => tab.path !== event.detail.path),
+          activeTab: pane.activeTab === event.detail.path
+            ? pane.tabs[pane.tabs.length - 2]?.path
+            : pane.activeTab
+        }))
+      );
+    };
+
+    window.addEventListener('file-deleted' as any, handleFileDeleted as EventListener);
+    return () => {
+      window.removeEventListener('file-deleted' as any, handleFileDeleted as EventListener);
+    };
+  }, []);
+
   const handleFileSelect = async (path: string) => {
     const activePane = panes.find(p => p.id === activePaneId);
     if (!activePane) return;
@@ -382,7 +402,7 @@ describe('Example Test', () => {
           ...pane,
           tabs: pane.tabs.filter(tab => tab.path !== path),
           activeTab: pane.activeTab === path
-            ? pane.tabs[0]?.path
+            ? pane.tabs[pane.tabs.length - 2]?.path
             : pane.activeTab
         }))
       );

@@ -1,9 +1,18 @@
 import { useState, useEffect, useCallback } from 'react';
-import { ChevronRight, ChevronDown, Folder, File, Plus, Trash2, Search } from 'lucide-react';
+import { ChevronRight, ChevronDown, Folder, File, Trash2, Search } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useToast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
 import { fileApi } from '@/utils/fileApi';
@@ -24,6 +33,11 @@ export const FileTree = ({ onSelect, refreshRef }: FileTreeProps) => {
   const [items, setItems] = useState<FileTreeItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [filter, setFilter] = useState('');
+  const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; path: string; name: string }>({
+    open: false,
+    path: '',
+    name: ''
+  });
   const { toast } = useToast();
 
   const buildFileTree = (files: string[]): FileTreeItem[] => {
@@ -95,6 +109,30 @@ export const FileTree = ({ onSelect, refreshRef }: FileTreeProps) => {
     }
   }, [loadFiles, refreshRef]);
 
+  const handleDelete = async () => {
+    try {
+      const success = await fileApi.deleteFile(deleteDialog.path);
+      if (success) {
+        toast({
+          title: "Success",
+          description: `Deleted ${deleteDialog.name}`,
+        });
+        loadFiles(); // Refresh the file list
+      } else {
+        throw new Error('Failed to delete file');
+      }
+    } catch (error) {
+      console.error('Error deleting file:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete file",
+        variant: "destructive",
+      });
+    } finally {
+      setDeleteDialog({ open: false, path: '', name: '' });
+    }
+  };
+
   const TreeNode = ({ item, level = 0 }: { item: FileTreeItem; level?: number }) => {
     const [isExpanded, setIsExpanded] = useState(true);
     const isFiltered = filter && !item.path.toLowerCase().includes(filter.toLowerCase());
@@ -109,23 +147,44 @@ export const FileTree = ({ onSelect, refreshRef }: FileTreeProps) => {
             { "pl-[calc(0.5rem_+_var(--indent))]": level > 0 }
           )}
           style={{ "--indent": `${level * 1}rem` } as any}
-          onClick={() => item.type === 'file' ? onSelect(item.path) : setIsExpanded(!isExpanded)}
         >
-          {item.type === 'directory' && (
-            <div className="text-muted-foreground">
-              {isExpanded ? (
-                <ChevronDown className="h-4 w-4" />
-              ) : (
-                <ChevronRight className="h-4 w-4" />
-              )}
-            </div>
+          <div 
+            className="flex-1 flex items-center gap-2"
+            onClick={() => item.type === 'file' ? onSelect(item.path) : setIsExpanded(!isExpanded)}
+          >
+            {item.type === 'directory' && (
+              <div className="text-muted-foreground">
+                {isExpanded ? (
+                  <ChevronDown className="h-4 w-4" />
+                ) : (
+                  <ChevronRight className="h-4 w-4" />
+                )}
+              </div>
+            )}
+            {item.type === 'directory' ? (
+              <Folder className="h-4 w-4 text-muted-foreground" />
+            ) : (
+              <File className="h-4 w-4 text-muted-foreground" />
+            )}
+            <span className="text-sm truncate flex-1">{item.name}</span>
+          </div>
+          {item.type === 'file' && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 opacity-0 group-hover:opacity-100 hover:text-destructive"
+              onClick={(e) => {
+                e.stopPropagation();
+                setDeleteDialog({ 
+                  open: true, 
+                  path: item.path,
+                  name: item.name
+                });
+              }}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
           )}
-          {item.type === 'directory' ? (
-            <Folder className="h-4 w-4 text-muted-foreground" />
-          ) : (
-            <File className="h-4 w-4 text-muted-foreground" />
-          )}
-          <span className="text-sm truncate flex-1">{item.name}</span>
         </div>
         {item.type === 'directory' && isExpanded && (
           <div>
@@ -168,6 +227,28 @@ export const FileTree = ({ onSelect, refreshRef }: FileTreeProps) => {
           )}
         </div>
       </ScrollArea>
+      <AlertDialog 
+        open={deleteDialog.open} 
+        onOpenChange={(open) => !open && setDeleteDialog({ open: false, path: '', name: '' })}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete File</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{deleteDialog.name}"? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDelete}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
