@@ -148,9 +148,42 @@ export class FileServer {
 
   private setupWebSocket(): void {
     console.log('Setting up WebSocket server on port 3003');
+
     this.wss.on('connection', (ws: WebSocket) => {
       console.log('New WebSocket connection established');
       this.clients.add(ws);
+
+      // Send initial project list
+      const projects = this.vfs.listProjects();
+      ws.send(JSON.stringify({
+        type: 'projectList',
+        data: { projects }
+      }));
+
+      ws.on('message', (data: string) => {
+        try {
+          const message: WebSocketMessage = JSON.parse(data);
+          console.log('Received WebSocket message:', message);
+
+          switch (message.type) {
+            case 'setProject':
+              const projectId = message.data.projectId;
+              if (projectId) {
+                const project = this.vfs.getProject(projectId);
+                if (project) {
+                  const files = this.vfs.listFiles(projectId);
+                  ws.send(JSON.stringify({
+                    type: 'projectFiles',
+                    data: { projectId, files }
+                  }));
+                }
+              }
+              break;
+          }
+        } catch (error) {
+          console.error('Error handling WebSocket message:', error);
+        }
+      });
 
       ws.on('close', () => {
         console.log('WebSocket connection closed');
@@ -159,42 +192,32 @@ export class FileServer {
 
       ws.on('error', (error) => {
         console.error('WebSocket error:', error);
+        this.clients.delete(ws);
       });
     });
 
     // Listen for file system events
-    this.vfs.on('fileChanged', (data: FileUpdate) => {
-      console.log('Broadcasting file change:', { 
-        projectId: data.projectId,
-        path: data.path,
-        type: data.type,
-        contentLength: data.content.length 
+    this.vfs.on('fileChanged', (update: FileUpdate) => {
+      const message = JSON.stringify({
+        type: 'fileChanged',
+        data: update
       });
-      this.broadcast({ type: 'fileChanged', data });
+      this.broadcast(message);
     });
 
-    this.vfs.on('fileDeleted', (data: { projectId: string, path: string }) => {
-      console.log('Broadcasting file deletion:', data);
-      this.broadcast({ type: 'fileDeleted', data });
-    });
-
-    this.vfs.on('projectDeleted', (data: { projectId: string }) => {
-      console.log('Broadcasting project deletion:', data);
-      this.broadcast({ type: 'projectDeleted', data });
+    this.vfs.on('projectDeleted', ({ projectId }) => {
+      const message = JSON.stringify({
+        type: 'projectDeleted',
+        data: { projectId }
+      });
+      this.broadcast(message);
     });
   }
 
-  private broadcast(message: WebSocketMessage): void {
-    const messageStr = JSON.stringify(message);
-    console.log('Broadcasting message:', { 
-      type: message.type, 
-      dataType: typeof message.data,
-      clientCount: this.clients.size 
-    });
-    
+  private broadcast(message: string): void {
     this.clients.forEach(client => {
       if (client.readyState === WebSocket.OPEN) {
-        client.send(messageStr);
+        client.send(message);
       }
     });
   }

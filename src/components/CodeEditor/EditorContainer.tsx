@@ -63,10 +63,96 @@ export const EditorContainer = () => {
   const refreshFileTreeRef = useRef<() => void>(() => {});
   const { toast } = useToast();
 
+  // Get current project ID
+  const getCurrentProjectId = useCallback(() => {
+    try {
+      const currentProject = localStorage.getItem('aiuxpot-current-project');
+      if (currentProject) {
+        const { id } = JSON.parse(currentProject);
+        return id;
+      }
+    } catch (error) {
+      console.error('Error getting current project:', error);
+    }
+    return null;
+  }, []);
+
+  // Listen for project changes
+  useEffect(() => {
+    const handleProjectChange = () => {
+      console.log('Project changed, clearing editor state');
+      // Reset to default state
+      setPanes([{
+        id: '1',
+        tabs: [],
+        activeTab: undefined
+      }]);
+      setActivePaneId('1');
+      setShowPreview(false);
+    };
+
+    previewApi.addListener('projectChanged', handleProjectChange);
+    return () => {
+      previewApi.removeListener('projectChanged', handleProjectChange);
+    };
+  }, []);
+
+  // Save editor state when it changes
+  useEffect(() => {
+    const currentProjectId = getCurrentProjectId();
+    if (!currentProjectId) return;
+
+    const state: SavedEditorState = {
+      panes,
+      activePaneId,
+      timestamp: Date.now()
+    };
+
+    localStorage.setItem(`${EDITOR_STATE_KEY}-${currentProjectId}`, JSON.stringify(state));
+  }, [panes, activePaneId, getCurrentProjectId]);
+
+  // Load editor state when project changes
+  useEffect(() => {
+    const currentProjectId = getCurrentProjectId();
+    if (!currentProjectId) return;
+
+    try {
+      const savedState = localStorage.getItem(`${EDITOR_STATE_KEY}-${currentProjectId}`);
+      if (savedState) {
+        const state = JSON.parse(savedState) as SavedEditorState;
+        // Only restore if saved less than 24 hours ago
+        if (Date.now() - state.timestamp < 24 * 60 * 60 * 1000) {
+          setPanes(state.panes);
+          setActivePaneId(state.activePaneId);
+        } else {
+          // Reset to default state if saved state is too old
+          setPanes([{
+            id: '1',
+            tabs: [],
+            activeTab: undefined
+          }]);
+          setActivePaneId('1');
+        }
+      }
+    } catch (error) {
+      console.error('Error loading editor state:', error);
+      // Reset to default state on error
+      setPanes([{
+        id: '1',
+        tabs: [],
+        activeTab: undefined
+      }]);
+      setActivePaneId('1');
+    }
+  }, [getCurrentProjectId]);
+
   // Load saved editor state
   useEffect(() => {
     try {
-      const savedState = localStorage.getItem(EDITOR_STATE_KEY);
+      const currentProjectId = getCurrentProjectId();
+      if (!currentProjectId) return;
+
+      const savedState = localStorage.getItem(`${EDITOR_STATE_KEY}-${currentProjectId}`);
       if (savedState) {
         const state = JSON.parse(savedState) as SavedEditorState;
         // Only restore if saved less than 24 hours ago
@@ -74,45 +160,19 @@ export const EditorContainer = () => {
           setPanes(state.panes);
           setActivePaneId(state.activePaneId);
         }
+      } else {
+        // Reset to default state if no saved state for this project
+        setPanes([{
+          id: '1',
+          tabs: [],
+          activeTab: undefined
+        }]);
+        setActivePaneId('1');
       }
     } catch (error) {
       console.error('Error loading editor state:', error);
     }
-  }, []);
-
-  // Save editor state
-  useEffect(() => {
-    const state: SavedEditorState = {
-      panes,
-      activePaneId,
-      timestamp: Date.now()
-    };
-    localStorage.setItem(EDITOR_STATE_KEY, JSON.stringify(state));
-  }, [panes, activePaneId]);
-
-  const templates = {
-    empty: '',
-    typescript: `// TypeScript file
-export function example() {
-  return 'Hello, World!';
-}`,
-    react: `import React from 'react';
-
-export function ExampleComponent() {
-  return (
-    <div>
-      <h1>Hello, World!</h1>
-    </div>
-  );
-}`,
-    test: `import { describe, it, expect } from 'vitest';
-
-describe('Example Test', () => {
-  it('should pass', () => {
-    expect(true).toBe(true);
-  });
-});`
-  };
+  }, [getCurrentProjectId]);
 
   // Load file contents when component mounts
   useEffect(() => {
@@ -486,6 +546,30 @@ describe('Example Test', () => {
   useEffect(() => {
     previewApi.connect();
   }, []);
+
+  const templates = {
+    empty: '',
+    typescript: `// TypeScript file
+export function example() {
+  return 'Hello, World!';
+}`,
+    react: `import React from 'react';
+
+export function ExampleComponent() {
+  return (
+    <div>
+      <h1>Hello, World!</h1>
+    </div>
+  );
+}`,
+    test: `import { describe, it, expect } from 'vitest';
+
+describe('Example Test', () => {
+  it('should pass', () => {
+    expect(true).toBe(true);
+  });
+});`
+  };
 
   return (
     <div className="flex flex-col w-full h-full">

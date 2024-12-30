@@ -67,6 +67,8 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     };
 
     loadProjects();
+    // Connect to WebSocket for real-time updates
+    previewApi.connect();
   }, []);
 
   // Save projects to localStorage
@@ -86,6 +88,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         previewApi.setCurrentProject(currentProject.id);
       } else {
         localStorage.removeItem(CURRENT_PROJECT_KEY);
+        previewApi.setCurrentProject(null);
       }
     } catch (error) {
       console.error('Error saving current project:', error);

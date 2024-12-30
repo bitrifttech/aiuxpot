@@ -18,45 +18,80 @@ class PreviewApi {
   private listeners: Map<string, Set<(data: any) => void>> = new Map();
   private fileCache: Map<string, { content: string; timestamp: number }> = new Map();
   private currentProjectId: string | null = null;
+  private reconnectAttempts: number = 0;
+  private maxReconnectAttempts: number = 5;
+
+  constructor() {
+    // Try to restore current project from localStorage
+    try {
+      const savedProject = localStorage.getItem('aiuxpot-current-project');
+      if (savedProject) {
+        const { id } = JSON.parse(savedProject);
+        this.currentProjectId = id;
+      }
+    } catch (error) {
+      console.error('Error restoring current project:', error);
+    }
+  }
 
   connect(): void {
-    if (this.ws) return;
+    if (this.ws?.readyState === WebSocket.OPEN) return;
 
-    this.ws = new WebSocket('ws://localhost:3003');
-    console.log('Connecting to WebSocket server...');
+    try {
+      this.ws = new WebSocket('ws://localhost:3003');
+      console.log('Connecting to WebSocket server...');
 
-    this.ws.onopen = () => {
-      console.log('WebSocket connection established');
-    };
-
-    this.ws.onmessage = (event) => {
-      try {
-        const message = JSON.parse(event.data);
-        this.notifyListeners(message.type, message.data);
-
-        // Update cache if file content changed
-        if (message.type === 'fileChanged') {
-          const cacheKey = this.getCacheKey(message.data.projectId, message.data.path);
-          this.fileCache.set(cacheKey, {
-            content: message.data.content,
-            timestamp: Date.now()
-          });
+      this.ws.onopen = () => {
+        console.log('WebSocket connection established');
+        this.reconnectAttempts = 0;
+        
+        // Send current project ID to sync server state
+        if (this.currentProjectId) {
+          this.ws.send(JSON.stringify({
+            type: 'setProject',
+            data: { projectId: this.currentProjectId }
+          }));
         }
-      } catch (error) {
-        console.error('Error parsing WebSocket message:', error);
-      }
-    };
+      };
 
-    this.ws.onclose = () => {
-      console.log('WebSocket connection closed');
-      this.ws = null;
-      // Try to reconnect after a delay
-      setTimeout(() => this.connect(), 5000);
-    };
+      this.ws.onmessage = (event) => {
+        try {
+          const message = JSON.parse(event.data);
+          this.notifyListeners(message.type, message.data);
 
-    this.ws.onerror = (error) => {
-      console.error('WebSocket error:', error);
-    };
+          if (message.type === 'fileChanged') {
+            const cacheKey = this.getCacheKey(message.data.projectId, message.data.path);
+            this.fileCache.set(cacheKey, {
+              content: message.data.content,
+              timestamp: Date.now()
+            });
+          }
+        } catch (error) {
+          console.error('Error handling WebSocket message:', error);
+        }
+      };
+
+      this.ws.onclose = () => {
+        console.log('WebSocket connection closed');
+        this.ws = null;
+
+        // Try to reconnect with backoff
+        if (this.reconnectAttempts < this.maxReconnectAttempts) {
+          const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
+          this.reconnectAttempts++;
+          console.log(`Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
+          setTimeout(() => this.connect(), delay);
+        } else {
+          console.error('Max reconnection attempts reached');
+        }
+      };
+
+      this.ws.onerror = (error) => {
+        console.error('WebSocket error:', error);
+      };
+    } catch (error) {
+      console.error('Error creating WebSocket connection:', error);
+    }
   }
 
   async createProject(name: string): Promise<string> {
@@ -113,11 +148,27 @@ class PreviewApi {
 
   setCurrentProject(projectId: string | null): void {
     console.log('Setting current project:', projectId);
-    this.currentProjectId = projectId;
-    if (projectId) {
-      localStorage.setItem('aiuxpot-current-project', JSON.stringify({ id: projectId }));
-    } else {
-      localStorage.removeItem('aiuxpot-current-project');
+    if (this.currentProjectId !== projectId) {
+      this.currentProjectId = projectId;
+      this.fileCache.clear();
+
+      // Update localStorage
+      if (projectId) {
+        localStorage.setItem('aiuxpot-current-project', JSON.stringify({ id: projectId }));
+      } else {
+        localStorage.removeItem('aiuxpot-current-project');
+      }
+
+      // Notify WebSocket if connected
+      if (this.ws?.readyState === WebSocket.OPEN) {
+        this.ws.send(JSON.stringify({
+          type: 'setProject',
+          data: { projectId }
+        }));
+      }
+
+      // Notify listeners
+      this.notifyListeners('projectChanged', { projectId });
     }
   }
 
@@ -221,19 +272,31 @@ class PreviewApi {
     return files;
   }
 
-  addEventListener(type: string, callback: (data: any) => void): void {
+  addListener(type: string, callback: (data: any) => void): void {
     if (!this.listeners.has(type)) {
       this.listeners.set(type, new Set());
     }
     this.listeners.get(type)?.add(callback);
   }
 
-  removeEventListener(type: string, callback: (data: any) => void): void {
+  removeListener(type: string, callback: (data: any) => void): void {
     this.listeners.get(type)?.delete(callback);
+    if (this.listeners.get(type)?.size === 0) {
+      this.listeners.delete(type);
+    }
   }
 
   private notifyListeners(type: string, data: any): void {
-    this.listeners.get(type)?.forEach(callback => callback(data));
+    const typeListeners = this.listeners.get(type);
+    if (typeListeners) {
+      typeListeners.forEach(callback => {
+        try {
+          callback(data);
+        } catch (error) {
+          console.error('Error in listener callback:', error);
+        }
+      });
+    }
   }
 
   private getCacheKey(projectId: string, path: string): string {

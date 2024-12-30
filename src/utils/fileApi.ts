@@ -18,9 +18,11 @@ const CURRENT_PROJECT_KEY = 'aiuxpot-current-project';
 
 class FileApi {
   private cache: Map<string, FileCache>;
+  private currentProjectId: string | null;
 
   constructor() {
     this.cache = new Map();
+    this.currentProjectId = null;
     this.loadCache();
   }
 
@@ -52,14 +54,44 @@ class FileApi {
     }
   }
 
-  async listFiles(): Promise<string[]> {
+  private clearCache() {
+    this.cache.clear();
+    localStorage.removeItem(FILE_CACHE_KEY);
+  }
+
+  private checkProjectChange(): string | null {
     try {
       const currentProject = localStorage.getItem(CURRENT_PROJECT_KEY);
       if (!currentProject) {
+        if (this.currentProjectId !== null) {
+          // Project was unselected, clear cache
+          this.currentProjectId = null;
+          this.clearCache();
+        }
+        return null;
+      }
+
+      const { id: projectId } = JSON.parse(currentProject);
+      if (this.currentProjectId !== projectId) {
+        // Project changed, clear cache
+        this.currentProjectId = projectId;
+        this.clearCache();
+      }
+      return projectId;
+    } catch (error) {
+      console.error('Error checking project change:', error);
+      return null;
+    }
+  }
+
+  async listFiles(): Promise<string[]> {
+    try {
+      const projectId = this.checkProjectChange();
+      if (!projectId) {
         console.error('No current project selected');
         return [];
       }
-      const { id: projectId } = JSON.parse(currentProject);
+
       const response = await fetch(`${API_BASE}/projects/${projectId}/files`);
       if (!response.ok) throw new Error('Failed to list files');
       const files = await response.json();
@@ -81,12 +113,12 @@ class FileApi {
       }
 
       console.log('Cache miss for:', path);
-      const currentProject = localStorage.getItem(CURRENT_PROJECT_KEY);
-      if (!currentProject) {
+      const projectId = this.checkProjectChange();
+      if (!projectId) {
         console.error('No current project selected');
         return null;
       }
-      const { id: projectId } = JSON.parse(currentProject);
+
       const response = await fetch(`${API_BASE}/projects/${projectId}/files/${encodeURIComponent(path)}`);
       if (!response.ok) throw new Error('Failed to read file');
       
@@ -111,12 +143,12 @@ class FileApi {
 
   async writeFile(path: string, content: string): Promise<boolean> {
     try {
-      const currentProject = localStorage.getItem(CURRENT_PROJECT_KEY);
-      if (!currentProject) {
+      const projectId = this.checkProjectChange();
+      if (!projectId) {
         console.error('No current project selected');
         return false;
       }
-      const { id: projectId } = JSON.parse(currentProject);
+
       const response = await fetch(`${API_BASE}/projects/${projectId}/files/${encodeURIComponent(path)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -144,12 +176,12 @@ class FileApi {
 
   async deleteFile(path: string): Promise<boolean> {
     try {
-      const currentProject = localStorage.getItem(CURRENT_PROJECT_KEY);
-      if (!currentProject) {
+      const projectId = this.checkProjectChange();
+      if (!projectId) {
         console.error('No current project selected');
         return false;
       }
-      const { id: projectId } = JSON.parse(currentProject);
+
       const response = await fetch(`${API_BASE}/projects/${projectId}/files/${encodeURIComponent(path)}`, {
         method: 'DELETE',
       });
@@ -191,11 +223,6 @@ class FileApi {
       console.error('Error initializing project:', error);
       throw error;
     }
-  }
-
-  clearCache() {
-    this.cache.clear();
-    localStorage.removeItem(FILE_CACHE_KEY);
   }
 }
 

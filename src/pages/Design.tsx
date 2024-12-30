@@ -1,19 +1,27 @@
 import { useParams, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
 import { useProject } from "@/contexts/ProjectContext";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useState } from "react";
 import { EditorContainer } from "@/components/CodeEditor/EditorContainer";
 
 const Design = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
-  const { projects } = useProject();
+  const { projects, currentProject, setCurrentProject } = useProject();
   const project = projects.find(p => p.id === projectId);
   const [messages, setMessages] = useState<Array<{ role: 'user' | 'assistant', content: string }>>([]);
   const [input, setInput] = useState("");
+
+  useEffect(() => {
+    if (project && (!currentProject || currentProject.id !== project.id)) {
+      setCurrentProject(project);
+    } else if (!project) {
+      navigate('/');
+    }
+  }, [project, currentProject, setCurrentProject, navigate]);
 
   if (!project) {
     return null;

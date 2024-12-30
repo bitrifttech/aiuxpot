@@ -16,6 +16,7 @@ import {
 import { useToast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
 import { fileApi } from '@/utils/fileApi';
+import { previewApi } from '@/utils/previewApi'; // Import previewApi
 
 interface FileTreeItem {
   name: string;
@@ -38,7 +39,134 @@ export const FileTree = ({ onSelect, refreshRef }: FileTreeProps) => {
     path: '',
     name: ''
   });
+  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
+  const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const { toast } = useToast();
+
+  // Track current project ID
+  const [currentProjectId, setCurrentProjectId] = useState<string | null>(() => {
+    try {
+      const currentProject = localStorage.getItem('aiuxpot-current-project');
+      if (currentProject) {
+        const { id } = JSON.parse(currentProject);
+        return id;
+      }
+    } catch (error) {
+      console.error('Error getting current project:', error);
+    }
+    return null;
+  });
+
+  // Update current project ID when it changes
+  useEffect(() => {
+    const checkProjectId = () => {
+      try {
+        const currentProject = localStorage.getItem('aiuxpot-current-project');
+        if (currentProject) {
+          const { id } = JSON.parse(currentProject);
+          setCurrentProjectId(prev => {
+            if (prev !== id) {
+              // Clear items when project changes
+              setItems([]);
+              return id;
+            }
+            return prev;
+          });
+        } else {
+          setCurrentProjectId(null);
+          setItems([]);
+        }
+      } catch (error) {
+        console.error('Error checking project:', error);
+      }
+    };
+
+    // Check immediately
+    checkProjectId();
+
+    // Set up interval to check for project changes
+    const interval = setInterval(checkProjectId, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const loadFiles = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const files = await fileApi.listFiles();
+      const tree = buildFileTree(files);
+      setItems(tree);
+    } catch (error) {
+      console.error('Error loading files:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load files",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [toast]);
+
+  // Listen for project changes and refresh files
+  useEffect(() => {
+    const handleProjectChange = () => {
+      console.log('Project changed, reloading files');
+      setItems([]); // Clear current files
+      setExpandedNodes(new Set()); // Reset expanded nodes
+      setSelectedFile(null); // Clear selected file
+      loadFiles(); // Load files for new project
+    };
+
+    previewApi.addListener('projectChanged', handleProjectChange);
+    return () => {
+      previewApi.removeListener('projectChanged', handleProjectChange);
+    };
+  }, [loadFiles]);
+
+  // Load files on mount and when refreshRef changes
+  useEffect(() => {
+    loadFiles();
+    if (refreshRef) {
+      refreshRef.current = loadFiles;
+    }
+  }, [loadFiles, refreshRef]);
+
+  // Get current project ID
+  const getCurrentProjectId = useCallback(() => {
+    try {
+      const currentProject = localStorage.getItem('aiuxpot-current-project');
+      if (currentProject) {
+        const { id } = JSON.parse(currentProject);
+        return id;
+      }
+    } catch (error) {
+      console.error('Error getting current project:', error);
+    }
+    return null;
+  }, []);
+
+  // Save expanded nodes state
+  useEffect(() => {
+    const currentProjectId = getCurrentProjectId();
+    if (!currentProjectId) return;
+
+    localStorage.setItem(`filetree-expanded-${currentProjectId}`, JSON.stringify(Array.from(expandedNodes)));
+  }, [expandedNodes, getCurrentProjectId]);
+
+  // Load expanded nodes state
+  useEffect(() => {
+    const currentProjectId = getCurrentProjectId();
+    if (!currentProjectId) return;
+
+    try {
+      const savedNodes = localStorage.getItem(`filetree-expanded-${currentProjectId}`);
+      if (savedNodes) {
+        setExpandedNodes(new Set(JSON.parse(savedNodes)));
+      }
+    } catch (error) {
+      console.error('Error loading expanded nodes:', error);
+    }
+  }, [getCurrentProjectId]);
 
   const buildFileTree = (files: string[]): FileTreeItem[] => {
     const root: { [key: string]: FileTreeItem } = {};
@@ -84,31 +212,6 @@ export const FileTree = ({ onSelect, refreshRef }: FileTreeProps) => {
     return convertToArray(root);
   };
 
-  const loadFiles = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const files = await fileApi.listFiles();
-      const tree = buildFileTree(files);
-      setItems(tree);
-    } catch (error) {
-      console.error('Error loading files:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load files",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  }, [toast]);
-
-  useEffect(() => {
-    loadFiles();
-    if (refreshRef) {
-      refreshRef.current = loadFiles;
-    }
-  }, [loadFiles, refreshRef]);
-
   const handleDelete = async () => {
     try {
       const success = await fileApi.deleteFile(deleteDialog.path);
@@ -134,7 +237,8 @@ export const FileTree = ({ onSelect, refreshRef }: FileTreeProps) => {
   };
 
   const TreeNode = ({ item, level = 0 }: { item: FileTreeItem; level?: number }) => {
-    const [isExpanded, setIsExpanded] = useState(true);
+    const [isExpanded, setIsExpanded] = useState(expandedNodes.has(item.path));
+
     const isFiltered = filter && !item.path.toLowerCase().includes(filter.toLowerCase());
     
     if (isFiltered) return null;
@@ -196,6 +300,12 @@ export const FileTree = ({ onSelect, refreshRef }: FileTreeProps) => {
       </div>
     );
   };
+
+  useEffect(() => {
+    if (selectedFile) {
+      setExpandedNodes(prev => new Set([...prev, ...selectedFile.split('/').slice(0, -1)]));
+    }
+  }, [selectedFile]);
 
   return (
     <div className="h-full flex flex-col">
