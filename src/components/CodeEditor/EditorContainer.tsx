@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { PreviewPane } from './PreviewPane';
 import { cn } from '@/lib/utils';
+import { previewApi } from '@/utils/previewApi'; // Import previewApi
 
 const MonacoEditor = lazy(() => import("./MonacoEditor").then(module => ({
   default: module.MonacoEditor
@@ -325,7 +326,23 @@ describe('Example Test', () => {
           : pane
       )
     );
-    
+
+    // Update preview for HTML, CSS, and JavaScript files
+    const activeTab = pane.tabs.find(tab => tab.path === pane.activeTab);
+    if (activeTab) {
+      const ext = activeTab.path.split('.').pop()?.toLowerCase();
+      if (ext && ['html', 'css', 'js'].includes(ext)) {
+        previewApi.updateFile(activeTab.path, value, `text/${ext}`).catch(error => {
+          console.error('Error updating preview:', error);
+          toast({
+            title: "Error",
+            description: "Failed to update preview",
+            variant: "destructive",
+          });
+        });
+      }
+    }
+
     // Trigger auto-save
     debouncedSave(pane.activeTab, value);
   };
@@ -464,6 +481,11 @@ describe('Example Test', () => {
         return 'plaintext';
     }
   };
+
+  // Initialize preview connection
+  useEffect(() => {
+    previewApi.connect();
+  }, []);
 
   return (
     <div className="flex flex-col w-full h-full">
