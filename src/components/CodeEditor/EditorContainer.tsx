@@ -12,6 +12,8 @@ import type { editor } from 'monaco-editor';
 import React from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { PreviewPane } from './PreviewPane';
+import { cn } from '@/lib/utils';
 
 const MonacoEditor = lazy(() => import("./MonacoEditor").then(module => ({
   default: module.MonacoEditor
@@ -29,7 +31,7 @@ interface OpenTab {
   isDirty: boolean;
 }
 
-interface EditorPane {
+export interface EditorPane {
   id: string;
   tabs: OpenTab[];
   activeTab?: string;
@@ -56,6 +58,7 @@ export const EditorContainer = () => {
   const [showNewFileDialog, setShowNewFileDialog] = useState(false);
   const [newFilePath, setNewFilePath] = useState('');
   const [selectedTemplate, setSelectedTemplate] = useState<string>('empty');
+  const [showPreview, setShowPreview] = useState(false);
   const refreshFileTreeRef = useRef<() => void>(() => {});
   const { toast } = useToast();
 
@@ -206,6 +209,20 @@ describe('Example Test', () => {
     const activePane = panes.find(p => p.id === activePaneId);
     if (!activePane) return;
 
+    // Check if file is already open in this pane
+    const existingTab = activePane.tabs.find(tab => tab.path === path);
+    if (existingTab) {
+      // Just switch to the existing tab
+      setPanes(currentPanes =>
+        currentPanes.map(pane =>
+          pane.id === activePaneId
+            ? { ...pane, activeTab: path }
+            : pane
+        )
+      );
+      return;
+    }
+
     try {
       setIsLoading(true);
       const content = await fileApi.readFile(path);
@@ -219,35 +236,17 @@ describe('Example Test', () => {
         return;
       }
 
+      // Add new tab with content
       setPanes(currentPanes =>
-        currentPanes.map(pane => {
-          if (pane.id !== activePaneId) return pane;
-
-          // Check if file is already open in this pane
-          const existingTabIndex = pane.tabs.findIndex(tab => tab.path === path);
-          
-          if (existingTabIndex !== -1) {
-            // Update existing tab's content
-            const updatedTabs = [...pane.tabs];
-            updatedTabs[existingTabIndex] = {
-              ...updatedTabs[existingTabIndex],
-              content,
-              isDirty: false
-            };
-            return {
-              ...pane,
-              tabs: updatedTabs,
-              activeTab: path
-            };
-          }
-
-          // Add new tab
-          return {
-            ...pane,
-            tabs: [...pane.tabs, { path, content, isDirty: false }],
-            activeTab: path
-          };
-        })
+        currentPanes.map(pane =>
+          pane.id === activePaneId
+            ? {
+                ...pane,
+                tabs: [...pane.tabs, { path, content, isDirty: false }],
+                activeTab: path
+              }
+            : pane
+        )
       );
     } catch (error) {
       console.error('Error loading file:', error);
@@ -430,151 +429,170 @@ describe('Example Test', () => {
     setActivePaneId(panes[0].id);
   };
 
+  const getLanguageFromFilename = (filename: string) => {
+    const extension = filename.split('.').pop();
+    switch (extension) {
+      case 'js':
+      case 'jsx':
+        return 'javascript';
+      case 'ts':
+      case 'tsx':
+        return 'typescript';
+      case 'json':
+        return 'json';
+      default:
+        return 'plaintext';
+    }
+  };
+
   return (
-    <ErrorBoundary>
-      <div className="h-full flex">
-        <div className="w-64 border-r">
-          <div className="p-2 border-b flex items-center justify-between">
-            <h2 className="font-semibold">Files</h2>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setShowNewFileDialog(true)}
-              className="h-8 w-8"
-            >
-              <Plus className="h-4 w-4" />
-            </Button>
-          </div>
-          <FileTree
-            currentFile={panes.find(p => p.id === activePaneId)?.activeTab}
-            onFileSelect={handleFileSelect}
-            onCreateFile={handleCreateFile}
-            onCreateDirectory={handleCreateDirectory}
-            onDeleteItem={handleDeleteItem}
-            onRefresh={(refresh) => {
-              refreshFileTreeRef.current = refresh;
-            }}
-          />
-        </div>
-
-        <Dialog open={showNewFileDialog} onOpenChange={setShowNewFileDialog}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Create New File</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div>
-                <label className="text-sm font-medium mb-2 block">
-                  File Path
-                </label>
-                <Input
-                  value={newFilePath}
-                  onChange={(e) => setNewFilePath(e.target.value)}
-                  placeholder="path/to/file.ts"
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium mb-2 block">
-                  Template
-                </label>
-                <select
-                  className="w-full p-2 rounded-md border"
-                  value={selectedTemplate}
-                  onChange={(e) => setSelectedTemplate(e.target.value)}
-                >
-                  <option value="empty">Empty File</option>
-                  <option value="typescript">TypeScript</option>
-                  <option value="react">React Component</option>
-                  <option value="test">Test File</option>
-                </select>
-              </div>
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setShowNewFileDialog(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={handleCreateFile}>Create</Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
-
-        <div className="flex-1 flex flex-col">
-          <ResizablePanelGroup direction="horizontal">
-            <ResizablePanel defaultSize={80}>
-              <ResizablePanelGroup direction="horizontal">
-                {panes.map((pane, index) => (
-                  <React.Fragment key={pane.id}>
-                    {index > 0 && <ResizableHandle withHandle />}
-                    <ResizablePanel>
-                      <div className="h-full flex flex-col" onClick={() => setActivePaneId(pane.id)}>
-                        <div className="border-b flex items-center">
-                          <TabsManager
-                            tabs={pane.tabs.map(tab => ({
-                              path: tab.path,
-                              isDirty: tab.isDirty
-                            }))}
-                            activeTab={pane.activeTab}
-                            onTabSelect={(path) => {
-                              setPanes(currentPanes =>
-                                currentPanes.map(p =>
-                                  p.id === pane.id
-                                    ? { ...p, activeTab: path }
-                                    : p
-                                )
-                              );
-                            }}
-                            onTabClose={(path) => handleTabClose(pane.id, path)}
-                          />
-                          <div className="flex items-center border-l px-2">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleSplitPane()}
-                              className="h-8 w-8"
-                            >
-                              <SplitSquareHorizontal className="h-4 w-4" />
-                            </Button>
-                            {panes.length > 1 && (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleClosePane(pane.id)}
-                                className="h-8 w-8"
-                              >
-                                <X className="h-4 w-4" />
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                        
-                        <div className="flex-1">
-                          {isLoading ? (
-                            <LoadingSpinner />
-                          ) : pane.activeTab ? (
-                            <Suspense fallback={<LoadingSpinner />}>
-                              <MonacoEditor
-                                code={pane.tabs.find(t => t.path === pane.activeTab)?.content || ''}
-                                onChange={(value) => handleCodeChange(pane.id, value)}
-                                showLineNumbers={true}
-                                wordWrap="on"
-                                language={pane.activeTab}
-                              />
-                            </Suspense>
-                          ) : (
-                            <div className="h-full flex items-center justify-center text-muted-foreground">
-                              Select a file to edit
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </ResizablePanel>
-                  </React.Fragment>
-                ))}
-              </ResizablePanelGroup>
-            </ResizablePanel>
-          </ResizablePanelGroup>
+    <div className="flex flex-col w-full h-full">
+      <div className="flex-none p-2 border-b flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowNewFileDialog(true)}
+          >
+            <Plus className="h-4 w-4 mr-1" />
+            New File
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowPreview(!showPreview)}
+          >
+            <SplitSquareHorizontal className="h-4 w-4 mr-1" />
+            {showPreview ? 'Hide Preview' : 'Show Preview'}
+          </Button>
         </div>
       </div>
-    </ErrorBoundary>
+
+      <ResizablePanelGroup direction="horizontal" className="flex-1">
+        <ResizablePanel defaultSize={20} minSize={15}>
+          <FileTree
+            onSelect={handleFileSelect}
+            refreshRef={refreshFileTreeRef}
+          />
+        </ResizablePanel>
+        <ResizableHandle />
+        <ResizablePanel defaultSize={showPreview ? 40 : 80}>
+          <div className="h-full flex flex-col">
+            <TabsManager
+              panes={panes}
+              activePaneId={activePaneId}
+              onTabClose={handleTabClose}
+              onTabChange={(paneId, path) => {
+                setPanes(currentPanes =>
+                  currentPanes.map(pane =>
+                    pane.id === paneId
+                      ? { ...pane, activeTab: path }
+                      : pane
+                  )
+                );
+              }}
+            />
+            <div className="flex-1 relative">
+              {isLoading && (
+                <div className="absolute inset-0 bg-background/50 flex items-center justify-center z-50">
+                  <LoadingSpinner />
+                </div>
+              )}
+              {panes.map(pane => {
+                const activeTab = pane.tabs.find(
+                  tab => tab.path === pane.activeTab
+                );
+                return (
+                  <div
+                    key={pane.id}
+                    className={cn(
+                      'absolute inset-0',
+                      pane.id === activePaneId ? 'block' : 'hidden'
+                    )}
+                  >
+                    {activeTab ? (
+                      <Suspense fallback={<LoadingSpinner />}>
+                        <MonacoEditor
+                          code={activeTab.content}
+                          language={getLanguageFromFilename(activeTab.path)}
+                          onChange={(value) =>
+                            handleCodeChange(pane.id, value)
+                          }
+                        />
+                      </Suspense>
+                    ) : (
+                      <div className="h-full flex items-center justify-center text-muted-foreground">
+                        No file open
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </ResizablePanel>
+        {showPreview && (
+          <>
+            <ResizableHandle />
+            <ResizablePanel defaultSize={40}>
+              {panes.map(pane => {
+                const activeTab = pane.tabs.find(
+                  tab => tab.path === pane.activeTab
+                );
+                return (
+                  <div
+                    key={pane.id}
+                    className={cn(
+                      'h-full',
+                      pane.id === activePaneId ? 'block' : 'hidden'
+                    )}
+                  >
+                    {activeTab ? (
+                      <PreviewPane
+                        content={activeTab.content}
+                        filePath={activeTab.path}
+                      />
+                    ) : (
+                      <div className="h-full flex items-center justify-center text-muted-foreground">
+                        No file open
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </ResizablePanel>
+          </>
+        )}
+      </ResizablePanelGroup>
+
+      <Dialog open={showNewFileDialog} onOpenChange={setShowNewFileDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create New File</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Input
+                id="path"
+                placeholder="File path (e.g., src/components/Button.tsx)"
+                value={newFilePath}
+                onChange={(e) => setNewFilePath(e.target.value)}
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-3">
+            <Button
+              variant="ghost"
+              onClick={() => setShowNewFileDialog(false)}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleCreateFile} disabled={!newFilePath}>
+              Create
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 };

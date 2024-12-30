@@ -40,7 +40,7 @@ const getLanguageFromFilename = (filename?: string): string => {
     case 'md':
       return 'markdown';
     default:
-      return 'typescript';
+      return 'plaintext';
   }
 };
 
@@ -51,13 +51,26 @@ export const MonacoEditor = ({
   wordWrap = 'on',
   language,
 }: MonacoEditorProps) => {
+  const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
+
+  useEffect(() => {
+    if (editorRef.current && code !== editorRef.current.getValue()) {
+      editorRef.current.setValue(code);
+    }
+  }, [code]);
+
+  const handleEditorDidMount = (editor: editor.IStandaloneCodeEditor) => {
+    editorRef.current = editor;
+  };
+
   return (
     <ErrorBoundary>
       <Editor
         height="100%"
         defaultLanguage={language || 'typescript'}
-        defaultValue={code}
+        value={code}
         onChange={onChange}
+        onMount={handleEditorDidMount}
         options={{
           minimap: { enabled: false },
           lineNumbers: showLineNumbers ? 'on' : 'off',
@@ -69,15 +82,7 @@ export const MonacoEditor = ({
             vertical: 'visible',
             horizontal: 'visible',
           },
-        }}
-        beforeMount={(monaco) => {
-          monaco.editor.defineTheme('custom-dark', {
-            base: 'vs-dark',
-            inherit: true,
-            rules: [],
-            colors: {},
-          });
-          monaco.editor.setTheme('custom-dark');
+          theme: 'vs-dark',
         }}
       />
     </ErrorBoundary>
