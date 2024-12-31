@@ -116,6 +116,60 @@
 - **Impact**: Potential cross-project file access
 - **Solution**: Strengthen project boundaries
 
+## AI Integration Issues
+
+### 1. Missing Dependencies 🔄
+- **Issue**: Required NPM packages not installed
+- **Status**: IN PROGRESS
+- **Missing Dependencies**:
+  - `openai`: OpenAI API client
+  - `@anthropic-ai/sdk`: Anthropic API client
+  - `node-cache`: Caching library
+  - `zod`: Schema validation
+- **Impact**: Build failures and import errors
+- **Solution**: Install required dependencies using npm/yarn
+
+### 2. Provider Implementation 🔄
+- **Issue**: AI provider implementations incomplete
+- **Status**: IN PROGRESS
+- **Remaining Tasks**:
+  - Complete OpenAI integration
+  - Implement Anthropic provider
+  - Add provider-specific error handling
+  - Implement rate limiting
+
+### 3. Configuration Management 🔄
+- **Issue**: Environment variables and configuration
+- **Status**: IN PROGRESS
+- **Tasks**:
+  - Add environment variable validation
+  - Create example configuration file
+  - Document configuration options
+  - Add configuration UI
+
+### 4. Testing and Documentation 📝
+- **Issue**: Missing tests and documentation
+- **Status**: PENDING
+- **Tasks**:
+  - Add unit tests for providers
+  - Create integration tests
+  - Document API usage
+  - Add setup instructions
+
+### 5. Environment Loading 🔄
+- **Issue**: Environment variables not accessible in browser
+- **Status**: IN PROGRESS
+- **Details**:
+  - Error: "process is not defined"
+  - Environment variables not properly exposed to client
+  - Vite environment handling needs configuration
+- **Required Changes**:
+  - Update Vite config to expose environment variables
+  - Use import.meta.env instead of process.env
+  - Add proper type definitions for environment variables
+  - Document environment variable usage
+- **Impact**: AI initialization fails in browser
+
 ## Documentation Issues
 
 ### 1. API Documentation
