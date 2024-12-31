@@ -7,6 +7,10 @@ import {
   AIProviderStats,
   AIModelInfo
 } from '@/types/ai';
+import { OllamaProvider } from './providers/ollama';
+import { OpenAIProvider } from './providers/openai';
+import { AnthropicProvider } from './providers/anthropic';
+import { loadEnvConfig, getProviderConfig } from './config';
 
 export class AIProviderManager {
   private providers: Map<string, AIProvider>;
@@ -16,6 +20,37 @@ export class AIProviderManager {
   constructor() {
     this.providers = new Map();
     this.stats = new Map();
+  }
+
+  async initialize(): Promise<void> {
+    const envConfig = loadEnvConfig();
+
+    // Initialize Ollama provider
+    const ollamaConfig = getProviderConfig('ollama', envConfig);
+    const ollamaProvider = new OllamaProvider(ollamaConfig);
+    this.registerProvider(ollamaProvider);
+
+    // Initialize OpenAI provider if API key is available
+    if (envConfig.OPENAI_API_KEY) {
+      const openaiConfig = getProviderConfig('openai', envConfig);
+      const openaiProvider = new OpenAIProvider(openaiConfig);
+      this.registerProvider(openaiProvider);
+    }
+
+    // Initialize Anthropic provider if API key is available
+    if (envConfig.ANTHROPIC_API_KEY) {
+      const anthropicConfig = getProviderConfig('anthropic', envConfig);
+      const anthropicProvider = new AnthropicProvider(anthropicConfig);
+      this.registerProvider(anthropicProvider);
+    }
+
+    // Set default provider from environment or first available
+    const defaultId = envConfig.AI_PROVIDER;
+    if (defaultId && this.providers.has(defaultId)) {
+      this.defaultProvider = defaultId;
+    } else {
+      this.defaultProvider = Array.from(this.providers.keys())[0];
+    }
   }
 
   registerProvider(provider: AIProvider): void {
