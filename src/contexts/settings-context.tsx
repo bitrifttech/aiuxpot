@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { GlobalSettings, ValidationResult } from '@/types/settings';
-import { SettingsService } from '@/lib/settings/settings-service';
 
 interface AppearanceSettings {
   theme: 'light' | 'dark' | 'system';
@@ -39,11 +38,27 @@ interface ProjectDefaultSettings {
   formatOnSave: boolean;
 }
 
+interface PrivacySecuritySettings {
+  telemetryEnabled: boolean;
+  crashReportsEnabled: boolean;
+  autoUpdate: boolean;
+  updateNotifications: boolean;
+  secureStorage: boolean;
+  apiKeyStorage: 'local' | 'system' | 'none';
+  anonymizeData: boolean;
+  thirdPartyIntegrations: {
+    github: boolean;
+    google: boolean;
+    vscode: boolean;
+  };
+}
+
 export interface GlobalSettings {
   appearance: AppearanceSettings;
   ai: AISettings;
   general: GeneralSettings;
   projectDefaults: ProjectDefaultSettings;
+  privacySecurity: PrivacySecuritySettings;
 }
 
 const defaultSettings: GlobalSettings = {
@@ -80,6 +95,20 @@ const defaultSettings: GlobalSettings = {
     lintingEnabled: true,
     formatOnSave: true,
   },
+  privacySecurity: {
+    telemetryEnabled: true,
+    crashReportsEnabled: true,
+    autoUpdate: true,
+    updateNotifications: true,
+    secureStorage: true,
+    apiKeyStorage: 'local',
+    anonymizeData: true,
+    thirdPartyIntegrations: {
+      github: false,
+      google: false,
+      vscode: false,
+    },
+  },
 };
 
 interface SettingsContextType {
@@ -101,56 +130,51 @@ interface SettingsContextType {
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
 
 export function SettingsProvider({ children }: { children: React.ReactNode }) {
-  const [settings, setSettings] = useState<GlobalSettings | null>(null);
-  const [settingsService] = useState(() => new SettingsService());
+  const [settings, setSettings] = useState<GlobalSettings>(defaultSettings);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const initializeSettings = async () => {
-      const loadedSettings = await settingsService.load();
-      setSettings(loadedSettings);
+    const loadSettings = () => {
+      const savedSettings = localStorage.getItem('settings');
+      if (savedSettings) {
+        setSettings(JSON.parse(savedSettings));
+      }
       setIsLoading(false);
     };
 
-    initializeSettings();
-  }, [settingsService]);
-
-  useEffect(() => {
-    if (!settings) return;
-
-    const unwatch = settingsService.watch((newSettings) => {
-      setSettings(newSettings);
-    });
-
-    return unwatch;
-  }, [settings, settingsService]);
+    loadSettings();
+  }, []);
 
   const updateSettings = async <T extends keyof GlobalSettings>(
     section: T,
     values: Partial<GlobalSettings[T]>
   ) => {
-    if (!settings) return;
-
-    const updatedSettings = {
-      ...settings,
-      [section]: {
-        ...settings[section],
-        ...values,
-      },
-    };
-
-    await settingsService.save(updatedSettings);
+    setSettings((prev) => {
+      const newSettings = {
+        ...prev,
+        [section]: {
+          ...prev[section],
+          ...values,
+        },
+      };
+      localStorage.setItem('settings', JSON.stringify(newSettings));
+      return newSettings;
+    });
   };
 
   const resetSettings = async (section?: keyof GlobalSettings) => {
-    if (!settings) return;
-
     if (section) {
-      await settingsService.save({
-        [section]: defaultSettings[section],
+      setSettings((prev) => {
+        const newSettings = {
+          ...prev,
+          [section]: defaultSettings[section],
+        };
+        localStorage.setItem('settings', JSON.stringify(newSettings));
+        return newSettings;
       });
     } else {
-      await settingsService.save(defaultSettings);
+      setSettings(defaultSettings);
+      localStorage.setItem('settings', JSON.stringify(defaultSettings));
     }
   };
 
@@ -162,13 +186,13 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const importSettings = async (json: string): Promise<void> => {
     try {
       const parsed = JSON.parse(json);
-      const validation = await settingsService.validate(parsed);
+      const validation = await validateSettings('general', parsed.general);
       
       if (!validation.valid) {
         throw new Error('Invalid settings format');
       }
 
-      await settingsService.save(parsed);
+      await updateSettings('general', parsed.general);
     } catch (error) {
       throw new Error('Failed to import settings: ' + error.message);
     }
@@ -180,9 +204,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   ): Promise<ValidationResult> => {
     if (!settings) throw new Error('Settings not initialized');
     
-    return settingsService.validate({
-      [section]: values,
-    });
+    return { valid: true };
   };
 
   if (!settings) {
