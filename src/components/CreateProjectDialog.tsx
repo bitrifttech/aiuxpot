@@ -1,21 +1,24 @@
-import { useState } from "react";
 import { Button } from "./ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "./ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from "./ui/dialog";
 import { Input } from "./ui/input";
 import { Textarea } from "./ui/textarea";
+import { Label } from "./ui/label";
+import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { Plus, Loader2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface CreateProjectDialogProps {
   onCreateProject: (title: string, description: string) => Promise<void>;
+  className?: string;
+  variant?: 'default' | 'floating';
 }
 
-export function CreateProjectDialog({ onCreateProject }: CreateProjectDialogProps) {
+export function CreateProjectDialog({ 
+  onCreateProject, 
+  className,
+  variant = 'default' 
+}: CreateProjectDialogProps) {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -58,18 +61,42 @@ export function CreateProjectDialog({ onCreateProject }: CreateProjectDialogProp
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="w-full h-full min-h-[200px]">
-          Create New Project
-        </Button>
+        {variant === 'floating' ? (
+          <Button
+            size="icon"
+            className={cn(
+              "h-14 w-14 rounded-full shadow-lg",
+              "bg-primary hover:bg-primary/90",
+              className
+            )}
+          >
+            <Plus className="h-6 w-6" />
+          </Button>
+        ) : (
+          <div
+            className={cn(
+              "hover:border-primary/50 transition-colors cursor-pointer p-4 flex items-center justify-center",
+              className
+            )}
+          >
+            <div className="text-center">
+              <Plus className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+              <h3 className="font-medium">Create New Project</h3>
+            </div>
+          </div>
+        )}
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Create New Project</DialogTitle>
+          <DialogDescription>
+            Fill in the details below to create a new project.
+          </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
+          <div className="space-y-2">
             <label htmlFor="title" className="text-sm font-medium">
-              Title
+              Project Title
             </label>
             <Input
               id="title"
@@ -79,7 +106,7 @@ export function CreateProjectDialog({ onCreateProject }: CreateProjectDialogProp
               disabled={isCreating}
             />
           </div>
-          <div>
+          <div className="space-y-2">
             <label htmlFor="description" className="text-sm font-medium">
               Description
             </label>
@@ -91,9 +118,22 @@ export function CreateProjectDialog({ onCreateProject }: CreateProjectDialogProp
               disabled={isCreating}
             />
           </div>
-          <Button type="submit" className="w-full" disabled={isCreating}>
-            {isCreating ? "Creating..." : "Create Project"}
-          </Button>
+          <DialogFooter>
+            <Button
+              type="submit"
+              disabled={isCreating}
+              className="w-full sm:w-auto"
+            >
+              {isCreating ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                "Create Project"
+              )}
+            </Button>
+          </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>

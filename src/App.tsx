@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ProjectProvider } from "@/contexts/ProjectContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { SidebarProvider } from "@/components/ui/sidebar";
 import Index from "./pages/Index";
 import Design from "./pages/Design";
 import TestDesign from "./pages/TestDesign";
@@ -17,19 +18,21 @@ const App = () => (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider defaultTheme="system" storageKey="vite-ui-theme">
         <ProjectProvider>
-          <TooltipProvider>
-            <div className="min-h-screen bg-background text-foreground">
-              <Toaster />
-              <Sonner />
-              <BrowserRouter>
-                <Routes>
-                  <Route path="/" element={<Index />} />
-                  <Route path="/design/:projectId" element={<Design />} />
-                  <Route path="/test-design/:projectId" element={<TestDesign />} />
-                </Routes>
-              </BrowserRouter>
-            </div>
-          </TooltipProvider>
+          <SidebarProvider>
+            <TooltipProvider>
+              <div className="min-h-screen bg-background text-foreground">
+                <Toaster />
+                <Sonner />
+                <BrowserRouter>
+                  <Routes>
+                    <Route path="/" element={<Index />} />
+                    <Route path="/design/:projectId" element={<Design />} />
+                    <Route path="/test-design/:projectId" element={<TestDesign />} />
+                  </Routes>
+                </BrowserRouter>
+              </div>
+            </TooltipProvider>
+          </SidebarProvider>
         </ProjectProvider>
       </ThemeProvider>
     </QueryClientProvider>

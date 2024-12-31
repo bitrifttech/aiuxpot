@@ -22,6 +22,14 @@ type SidebarContext = {
 
 const SidebarContext = React.createContext<SidebarContext | null>(null)
 
+interface SidebarContextType {
+  isOpen: boolean;
+  isMobile: boolean;
+  toggleSidebar: () => void;
+}
+
+const SidebarContextType = React.createContext<SidebarContextType | undefined>(undefined);
+
 export function useSidebar() {
   const context = React.useContext(SidebarContext)
   if (!context) {
@@ -39,58 +47,93 @@ export function useSidebar() {
   return context
 }
 
-interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {
-  defaultOpen?: boolean
+export function useSidebarType() {
+  const context = React.useContext(SidebarContextType);
+  if (context === undefined) {
+    throw new Error('useSidebar must be used within a SidebarProvider');
+  }
+  return context;
 }
 
-export const SidebarProvider = React.forwardRef<HTMLDivElement, SidebarProps>(
-  ({ defaultOpen = true, children, ...props }, ref) => {
-    const isMobile = useIsMobile()
-    const [open, setOpen] = React.useState(defaultOpen)
-    const [openMobile, setOpenMobile] = React.useState(false)
+export function SidebarProvider({ children }: { children: React.ReactNode }) {
+  const isMobile = useIsMobile()
+  const [open, setOpen] = React.useState(true)
+  const [openMobile, setOpenMobile] = React.useState(false)
 
-    const toggleSidebar = React.useCallback(() => {
-      if (isMobile) {
-        setOpenMobile((prev) => !prev)
-      } else {
-        setOpen((prev) => !prev)
-      }
-    }, [isMobile])
+  const toggleSidebar = React.useCallback(() => {
+    if (isMobile) {
+      setOpenMobile((prev) => !prev)
+    } else {
+      setOpen((prev) => !prev)
+    }
+  }, [isMobile])
 
-    const value = React.useMemo(
-      () => ({
-        state: open ? "expanded" : "collapsed",
-        open,
-        setOpen,
-        openMobile,
-        setOpenMobile,
-        isMobile,
-        toggleSidebar,
-      }),
-      [open, openMobile, isMobile, toggleSidebar]
-    )
+  const value = React.useMemo(
+    () => ({
+      state: open ? "expanded" : "collapsed",
+      open,
+      setOpen,
+      openMobile,
+      setOpenMobile,
+      isMobile,
+      toggleSidebar,
+    }),
+    [open, openMobile, isMobile, toggleSidebar]
+  )
 
-    return (
-      <SidebarContext.Provider value={value}>
-        <div ref={ref} {...props}>
+  const valueType = React.useMemo(
+    () => ({
+      isOpen: open,
+      isMobile,
+      toggleSidebar,
+    }),
+    [open, isMobile, toggleSidebar]
+  )
+
+  return (
+    <SidebarContext.Provider value={value}>
+      <SidebarContextType.Provider value={valueType}>
+        <div>
           {children}
         </div>
-      </SidebarContext.Provider>
-    )
-  }
-)
-SidebarProvider.displayName = "SidebarProvider"
+      </SidebarContextType.Provider>
+    </SidebarContext.Provider>
+  )
+}
 
 export const Sidebar = React.forwardRef<HTMLDivElement, SidebarProps>(
   ({ className, children, ...props }, ref) => {
-    const { open, openMobile, isMobile } = useSidebar()
+    const { open, openMobile, isMobile, setOpenMobile } = useSidebar()
+
+    // Handle clicks outside sidebar on mobile
+    React.useEffect(() => {
+      if (!isMobile) return
+
+      const handleClickOutside = (event: MouseEvent) => {
+        const sidebar = document.getElementById('app-sidebar')
+        if (sidebar && !sidebar.contains(event.target as Node) && openMobile) {
+          setOpenMobile(false)
+        }
+      }
+
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }, [isMobile, openMobile])
 
     return (
       <div
         ref={ref}
+        id="app-sidebar"
         className={cn(
-          "relative flex h-screen flex-col border-r bg-background",
-          isMobile ? "w-full" : open ? SIDEBAR_WIDTH : SIDEBAR_WIDTH_ICON,
+          "fixed inset-y-0 left-0 z-50 flex h-screen flex-col border-r bg-background transition-transform duration-300 ease-in-out",
+          isMobile
+            ? openMobile
+              ? "translate-x-0 shadow-lg"
+              : "-translate-x-full"
+            : open
+              ? "w-64 translate-x-0"
+              : "w-16 translate-x-0",
+          "md:relative",
           className
         )}
         {...props}
