@@ -3,6 +3,7 @@ import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { SettingsLayout } from '@/components/settings/settings-layout';
 import { GeneralSettings } from '@/components/settings/sections/general-settings';
 import { AISettings } from '@/components/settings/sections/ai-settings';
+import { AppearanceSettings } from '@/components/settings/sections/appearance-settings';
 import { SettingsProvider } from '@/contexts/settings-context';
 import { Loader2 } from 'lucide-react';
 
@@ -21,17 +22,18 @@ export default function Settings() {
   }
 
   return (
-    <Suspense fallback={<LoadingFallback />}>
-      <SettingsProvider>
-        <SettingsLayout>
+    <SettingsProvider>
+      <SettingsLayout>
+        <Suspense fallback={<LoadingFallback />}>
           <Routes>
             <Route path="general" element={<GeneralSettings />} />
             <Route path="ai" element={<AISettings />} />
+            <Route path="appearance" element={<AppearanceSettings />} />
             {/* Add other settings routes as they are implemented */}
             <Route path="*" element={<Navigate to="/settings/general" replace />} />
           </Routes>
-        </SettingsLayout>
-      </SettingsProvider>
-    </Suspense>
+        </Suspense>
+      </SettingsLayout>
+    </SettingsProvider>
   );
 }

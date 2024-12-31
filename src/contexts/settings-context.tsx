@@ -1,6 +1,62 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import { GlobalSettings, ValidationResult } from '@/types/settings';
 import { SettingsService } from '@/lib/settings/settings-service';
+
+interface AppearanceSettings {
+  theme: 'light' | 'dark' | 'system';
+  fontSize: string;
+  fontFamily: string;
+  sidebarPosition: 'left' | 'right';
+  uiDensity: 'comfortable' | 'compact';
+  showLineNumbers: boolean;
+  showMiniMap: boolean;
+}
+
+interface AISettings {
+  provider: string;
+  model: string;
+  apiKey: string;
+  temperature: number;
+  maxTokens: number;
+}
+
+interface GeneralSettings {
+  language: string;
+  autoSave: boolean;
+  autoSaveInterval: number;
+  updateChannel: 'stable' | 'beta' | 'nightly';
+}
+
+export interface GlobalSettings {
+  appearance: AppearanceSettings;
+  ai: AISettings;
+  general: GeneralSettings;
+}
+
+const defaultSettings: GlobalSettings = {
+  appearance: {
+    theme: 'system',
+    fontSize: '14px',
+    fontFamily: 'Inter',
+    sidebarPosition: 'left',
+    uiDensity: 'comfortable',
+    showLineNumbers: true,
+    showMiniMap: true,
+  },
+  ai: {
+    provider: 'openai',
+    model: 'gpt-4',
+    apiKey: '',
+    temperature: 0.7,
+    maxTokens: 2000,
+  },
+  general: {
+    language: 'en',
+    autoSave: true,
+    autoSaveInterval: 30,
+    updateChannel: 'stable',
+  },
+};
 
 interface SettingsContextType {
   settings: GlobalSettings;
@@ -67,10 +123,10 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
 
     if (section) {
       await settingsService.save({
-        [section]: undefined,
+        [section]: defaultSettings[section],
       });
     } else {
-      await settingsService.save({});
+      await settingsService.save(defaultSettings);
     }
   };
 
