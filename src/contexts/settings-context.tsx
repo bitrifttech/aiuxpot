@@ -27,10 +27,23 @@ interface GeneralSettings {
   updateChannel: 'stable' | 'beta' | 'nightly';
 }
 
+interface ProjectDefaultSettings {
+  template: string;
+  framework: string;
+  cssFramework: string;
+  componentLibrary: string;
+  defaultLayout: 'single' | 'split' | 'grid';
+  defaultViewport: 'desktop' | 'tablet' | 'mobile';
+  gitIntegration: boolean;
+  lintingEnabled: boolean;
+  formatOnSave: boolean;
+}
+
 export interface GlobalSettings {
   appearance: AppearanceSettings;
   ai: AISettings;
   general: GeneralSettings;
+  projectDefaults: ProjectDefaultSettings;
 }
 
 const defaultSettings: GlobalSettings = {
@@ -55,6 +68,17 @@ const defaultSettings: GlobalSettings = {
     autoSave: true,
     autoSaveInterval: 30,
     updateChannel: 'stable',
+  },
+  projectDefaults: {
+    template: 'blank',
+    framework: 'react',
+    cssFramework: 'tailwind',
+    componentLibrary: 'shadcn',
+    defaultLayout: 'split',
+    defaultViewport: 'desktop',
+    gitIntegration: true,
+    lintingEnabled: true,
+    formatOnSave: true,
   },
 };
 

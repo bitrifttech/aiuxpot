@@ -4,6 +4,7 @@ import { SettingsLayout } from '@/components/settings/settings-layout';
 import { GeneralSettings } from '@/components/settings/sections/general-settings';
 import { AISettings } from '@/components/settings/sections/ai-settings';
 import { AppearanceSettings } from '@/components/settings/sections/appearance-settings';
+import { ProjectDefaults } from '@/components/settings/sections/project-defaults';
 import { SettingsProvider } from '@/contexts/settings-context';
 import { Loader2 } from 'lucide-react';
 
@@ -29,7 +30,7 @@ export default function Settings() {
             <Route path="general" element={<GeneralSettings />} />
             <Route path="ai" element={<AISettings />} />
             <Route path="appearance" element={<AppearanceSettings />} />
-            {/* Add other settings routes as they are implemented */}
+            <Route path="project-defaults" element={<ProjectDefaults />} />
             <Route path="*" element={<Navigate to="/settings/general" replace />} />
           </Routes>
         </Suspense>
