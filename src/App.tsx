@@ -11,6 +11,7 @@ import { AIProvider } from "@/contexts/ai-context";
 import Index from "./pages/Index";
 import Design from "./pages/Design";
 import TestDesign from "./pages/TestDesign";
+import Settings from "./pages/Settings";
 
 const queryClient = new QueryClient();
 
@@ -30,6 +31,7 @@ const App = () => (
                       <Route path="/" element={<Index />} />
                       <Route path="/design/:projectId" element={<Design />} />
                       <Route path="/test-design/:projectId" element={<TestDesign />} />
+                      <Route path="/settings/*" element={<Settings />} />
                     </Routes>
                   </BrowserRouter>
                 </div>
