@@ -1,69 +1,112 @@
-# Welcome to your Lovable project
+# AI-Powered UX Design Platform
 
-## Project info
+## Overview
+aiuxpot is a powerful local-first UX design platform that combines AI capabilities with traditional design tools. It allows developers to create, manage, and test design projects while maintaining data privacy and control.
 
-**URL**: https://lovable.dev/projects/57f9cbf4-48d7-42ae-81dd-7f872e28940e
+## Prerequisites
+- Node.js (v18.0.0 or higher)
+- npm (v9.0.0 or higher) or yarn (v1.22.0 or higher)
+- Modern web browser (Chrome, Firefox, Safari, or Edge)
 
-## How can I edit this code?
+## Quick Start
 
-There are several ways of editing your application.
+### Installation
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/aiuxpot.git
+cd aiuxpot
 
-**Use Lovable**
+# Install dependencies for both client and server
+npm install
+cd server && npm install && cd ..
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/57f9cbf4-48d7-42ae-81dd-7f872e28940e) and start prompting.
+# Set up environment variables
+cp .env.example .env
+```
 
-Changes made via Lovable will be committed automatically to this repo.
+### Environment Variables
+Create a `.env` file in the root directory with the following variables:
+```env
+# Server Configuration
+PORT=3001
+WEBSOCKET_PORT=3003
+NODE_ENV=development
 
-**Use your preferred IDE**
+# File System Configuration
+MAX_FILE_SIZE=5242880  # 5MB in bytes
+CACHE_DURATION=86400000  # 24 hours in milliseconds
+```
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+### Development Server
+```bash
+# Start the backend server
+npm run server
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# In a new terminal, start the frontend development server
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+The application will be available at:
+- Frontend: http://localhost:5173
+- Backend API: http://localhost:3001
+- WebSocket: ws://localhost:3003
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## Project Structure
+```
+aiuxpot/
+├── src/               # Frontend source code
+│   ├── components/    # React components
+│   ├── contexts/      # React contexts
+│   ├── hooks/         # Custom React hooks
+│   ├── utils/         # Utility functions
+│   └── pages/         # Page components
+├── server/            # Backend source code
+│   ├── virtualFs.ts   # Virtual file system
+│   └── fileServer.ts  # Express server
+└── Documentation/     # Project documentation
+```
 
-**Use GitHub Codespaces**
+## Available Scripts
+- `npm run dev`: Start frontend development server
+- `npm run server`: Start backend server
+- `npm run build`: Build production bundle
+- `npm run preview`: Preview production build
+- `npm run lint`: Run ESLint
+- `npm run test`: Run tests (when implemented)
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+## Development Features
+- Real-time file preview
+- Project-based file management
+- WebSocket-based live updates
+- Integrated code editor
+- AI-powered design suggestions (coming soon)
 
-## What technologies are used for this project?
+## Troubleshooting Common Issues
 
-This project is built with .
+### WebSocket Connection Issues
+If you experience WebSocket connection problems:
+1. Ensure both frontend and backend servers are running
+2. Check if ports 3001 and 3003 are available
+3. Verify WebSocket URL in frontend configuration
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+### File Loading Issues
+If files don't load properly:
+1. Clear browser cache
+2. Restart both frontend and backend servers
+3. Check browser console for specific error messages
 
-## How can I deploy this project?
+## Contributing
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
 
-Simply open [Lovable](https://lovable.dev/projects/57f9cbf4-48d7-42ae-81dd-7f872e28940e) and click on Share -> Publish.
+## License
+This project is licensed under the MIT License - see the LICENSE file for details.
 
-## I want to use a custom domain - is that possible?
-
-We don't support custom domains (yet). If you want to deploy your project under your own domain then we recommend using Netlify. Visit our docs for more details: [Custom domains](https://docs.lovable.dev/tips-tricks/custom-domain/)
+## Support
+For support, please:
+1. Check the [Documentation](./Documentation) folder
+2. Open an issue on GitHub
+3. Contact the development team

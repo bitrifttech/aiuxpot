@@ -9,10 +9,12 @@ interface FileResponse {
 interface FileCache {
   content: string;
   timestamp: number;
+  hash: string;
 }
 
 const FILE_CACHE_KEY = 'aiuxpot-file-cache';
-const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
+const CACHE_DURATION = 5000; // 5 seconds
+const MAX_CACHE_SIZE = 100; // Maximum number of cached files
 const API_BASE = 'http://localhost:3001';
 const CURRENT_PROJECT_KEY = 'aiuxpot-current-project';
 
@@ -24,6 +26,16 @@ class FileApi {
     this.cache = new Map();
     this.currentProjectId = null;
     this.loadCache();
+    // Clean cache periodically
+    setInterval(() => this.cleanCache(), 60000); // Clean every minute
+  }
+
+  private async computeHash(content: string): Promise<string> {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(content);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
   }
 
   private loadCache() {
@@ -54,9 +66,30 @@ class FileApi {
     }
   }
 
-  private clearCache() {
-    this.cache.clear();
-    localStorage.removeItem(FILE_CACHE_KEY);
+  private cleanCache() {
+    const now = Date.now();
+    let changed = false;
+    
+    // Remove expired entries
+    for (const [path, cache] of this.cache.entries()) {
+      if (now - cache.timestamp > CACHE_DURATION) {
+        this.cache.delete(path);
+        changed = true;
+      }
+    }
+
+    // Enforce maximum cache size
+    if (this.cache.size > MAX_CACHE_SIZE) {
+      const entries = Array.from(this.cache.entries());
+      entries.sort((a, b) => a[1].timestamp - b[1].timestamp);
+      const toRemove = entries.slice(0, entries.length - MAX_CACHE_SIZE);
+      toRemove.forEach(([key]) => this.cache.delete(key));
+      changed = true;
+    }
+
+    if (changed) {
+      this.saveCache();
+    }
   }
 
   private checkProjectChange(): string | null {
@@ -103,46 +136,65 @@ class FileApi {
     }
   }
 
-  async readFile(path: string): Promise<string | null> {
+  async readFile(path: string): Promise<FileResponse> {
     try {
-      // Check cache first
       const cached = this.cache.get(path);
-      if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-        console.log('Cache hit for:', path);
-        return cached.content;
+      const now = Date.now();
+
+      if (cached && now - cached.timestamp < CACHE_DURATION) {
+        console.log('Returning cached file:', path);
+        return {
+          type: 'file',
+          content: cached.content
+        };
       }
 
-      console.log('Cache miss for:', path);
       const projectId = this.checkProjectChange();
       if (!projectId) {
-        console.error('No current project selected');
-        return null;
+        throw new Error('No current project selected');
       }
 
-      const response = await fetch(`${API_BASE}/projects/${projectId}/files/${encodeURIComponent(path)}`);
-      if (!response.ok) throw new Error('Failed to read file');
-      
-      const data = await response.json();
-      if (data.type === 'directory') {
-        return null;
-      }
-
-      // Update cache
-      this.cache.set(path, {
-        content: data.content,
-        timestamp: Date.now()
+      const response = await fetch(`${API_BASE}/projects/${projectId}/files/${encodeURIComponent(path)}`, {
+        headers: {
+          'Cache-Control': 'no-cache'
+        }
       });
+
+      if (!response.ok) {
+        throw new Error(`Failed to read file: ${path}`);
+      }
+
+      const content = await response.text();
+      const hash = await this.computeHash(content);
+
+      this.cache.set(path, {
+        content,
+        timestamp: now,
+        hash
+      });
+
       this.saveCache();
-      
-      return data.content;
+      return {
+        type: 'file',
+        content
+      };
     } catch (error) {
       console.error('Error reading file:', error);
-      return null;
+      throw error;
     }
   }
 
   async writeFile(path: string, content: string): Promise<boolean> {
     try {
+      const hash = await this.computeHash(content);
+      const cached = this.cache.get(path);
+
+      // Only update if content has changed
+      if (cached && cached.hash === hash) {
+        console.log('File content unchanged, skipping update');
+        return true;
+      }
+
       const projectId = this.checkProjectChange();
       if (!projectId) {
         console.error('No current project selected');
@@ -151,7 +203,9 @@ class FileApi {
 
       const response = await fetch(`${API_BASE}/projects/${projectId}/files/${encodeURIComponent(path)}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({ 
           content,
           type: 'file'  
@@ -163,7 +217,8 @@ class FileApi {
       // Update cache
       this.cache.set(path, {
         content,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        hash
       });
       this.saveCache();
       
@@ -223,6 +278,16 @@ class FileApi {
       console.error('Error initializing project:', error);
       throw error;
     }
+  }
+
+  clearCache(): void {
+    this.cache.clear();
+    localStorage.removeItem(FILE_CACHE_KEY);
+  }
+
+  forceRefresh(path: string): void {
+    this.cache.delete(path);
+    this.saveCache();
   }
 }
 

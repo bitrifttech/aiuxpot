@@ -186,12 +186,11 @@ export const EditorContainer = () => {
               pane.tabs.map(async (tab) => {
                 try {
                   console.log('Loading file content for:', tab.path);
-                  const content = await fileApi.readFile(tab.path);
-                  if (content !== null) {
-                    console.log('Content loaded for:', tab.path);
-                    return { ...tab, content };
+                  const fileResponse = await fileApi.readFile(tab.path);
+                  if (!fileResponse || !fileResponse.content) {
+                    console.warn('No content found for:', tab.path);
                   }
-                  console.warn('No content found for:', tab.path);
+                  return { ...tab, content: fileResponse.content };
                 } catch (error) {
                   console.error('Error loading file:', tab.path, error);
                 }
@@ -306,9 +305,9 @@ export const EditorContainer = () => {
 
     try {
       setIsLoading(true);
-      const content = await fileApi.readFile(path);
+      const fileResponse = await fileApi.readFile(path);
       
-      if (content === null) {
+      if (!fileResponse || !fileResponse.content) {
         toast({
           title: "Error",
           description: "Could not read file content",
@@ -323,7 +322,7 @@ export const EditorContainer = () => {
           pane.id === activePaneId
             ? {
                 ...pane,
-                tabs: [...pane.tabs, { path, content, isDirty: false }],
+                tabs: [...pane.tabs, { path, content: fileResponse.content, isDirty: false }],
                 activeTab: path
               }
             : pane

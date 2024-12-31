@@ -105,12 +105,15 @@ export class FileServer {
       try {
         const file = this.vfs.getFile(projectId, filePath);
         if (file) {
-          const contentType = this.vfs.getContentType(filePath);
-          res.type(contentType).send(file.content);
-          console.log('File sent successfully:', { projectId, filePath, contentType });
+          console.log('File found:', { projectId, filePath, type: file.type });
+          // Always return a FileResponse object with type and content
+          res.json({
+            type: 'file',  // Always 'file' since we don't support directories yet
+            content: file.content
+          });
         } else {
           console.log('File not found:', { projectId, filePath });
-          res.sendStatus(404);
+          res.status(404).json({ error: 'File not found' });
         }
       } catch (error) {
         console.error('Error getting file:', { projectId, filePath, error });

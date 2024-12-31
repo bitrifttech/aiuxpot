@@ -4,6 +4,17 @@ import { Button } from "./ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "./ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
+import { useState } from 'react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface ProjectCardProps {
   project: Project;
@@ -13,10 +24,16 @@ interface ProjectCardProps {
 export function ProjectCard({ project, onDelete }: ProjectCardProps) {
   const { toast } = useToast();
   const navigate = useNavigate();
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
+    setShowDeleteDialog(true);
+  };
+
+  const confirmDelete = () => {
     onDelete(project.id);
+    setShowDeleteDialog(false);
     toast({
       title: "Project deleted",
       description: `${project.title} has been deleted successfully.`,
@@ -28,32 +45,60 @@ export function ProjectCard({ project, onDelete }: ProjectCardProps) {
   };
 
   return (
-    <Card 
-      className="hover:border-primary/50 transition-colors cursor-pointer"
-      onClick={handleClick}
-    >
-      <CardHeader>
-        <CardTitle className="flex justify-between items-center">
-          <span>{project.title}</span>
-          <div className="flex gap-2">
-            <Button variant="ghost" size="icon" onClick={(e) => {
-              e.stopPropagation();
-              navigate(`/test-design/${project.id}`);
-            }}>
-              <span className="text-xs">Test</span>
-            </Button>
-            <Button variant="ghost" size="icon" onClick={handleDelete}>
-              <Trash className="h-4 w-4 text-destructive" />
-            </Button>
-          </div>
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <p className="text-sm text-muted-foreground">{project.description}</p>
-      </CardContent>
-      <CardFooter className="text-xs text-muted-foreground">
-        Created: {new Date(project.createdAt).toLocaleDateString()}
-      </CardFooter>
-    </Card>
+    <>
+      <Card 
+        className="hover:border-primary/50 transition-colors cursor-pointer"
+        onClick={handleClick}
+      >
+        <CardHeader>
+          <CardTitle className="flex justify-between items-center">
+            <span>{project.title}</span>
+            <div className="flex gap-2">
+              <Button variant="ghost" size="icon" onClick={(e) => {
+                e.stopPropagation();
+                navigate(`/test-design/${project.id}`);
+              }}>
+                <span className="text-xs">Test</span>
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-destructive hover:text-destructive/90"
+                onClick={handleDelete}
+              >
+                <Trash className="h-4 w-4" />
+              </Button>
+            </div>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">{project.description}</p>
+        </CardContent>
+        <CardFooter className="text-xs text-muted-foreground">
+          Created: {new Date(project.createdAt).toLocaleDateString()}
+        </CardFooter>
+      </Card>
+
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the project "{project.title}" and all its files.
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete Project
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }

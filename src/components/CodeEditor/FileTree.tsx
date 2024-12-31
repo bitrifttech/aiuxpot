@@ -57,38 +57,6 @@ export const FileTree = ({ onSelect, refreshRef }: FileTreeProps) => {
     return null;
   });
 
-  // Update current project ID when it changes
-  useEffect(() => {
-    const checkProjectId = () => {
-      try {
-        const currentProject = localStorage.getItem('aiuxpot-current-project');
-        if (currentProject) {
-          const { id } = JSON.parse(currentProject);
-          setCurrentProjectId(prev => {
-            if (prev !== id) {
-              // Clear items when project changes
-              setItems([]);
-              return id;
-            }
-            return prev;
-          });
-        } else {
-          setCurrentProjectId(null);
-          setItems([]);
-        }
-      } catch (error) {
-        console.error('Error checking project:', error);
-      }
-    };
-
-    // Check immediately
-    checkProjectId();
-
-    // Set up interval to check for project changes
-    const interval = setInterval(checkProjectId, 1000);
-    return () => clearInterval(interval);
-  }, []);
-
   const loadFiles = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -111,10 +79,8 @@ export const FileTree = ({ onSelect, refreshRef }: FileTreeProps) => {
   useEffect(() => {
     const handleProjectChange = () => {
       console.log('Project changed, reloading files');
-      setItems([]); // Clear current files
-      setExpandedNodes(new Set()); // Reset expanded nodes
-      setSelectedFile(null); // Clear selected file
-      loadFiles(); // Load files for new project
+      // Don't clear items immediately, wait for loadFiles to complete
+      loadFiles();
     };
 
     previewApi.addListener('projectChanged', handleProjectChange);
@@ -123,27 +89,40 @@ export const FileTree = ({ onSelect, refreshRef }: FileTreeProps) => {
     };
   }, [loadFiles]);
 
-  // Load files on mount and when refreshRef changes
+  // Load files on mount and when currentProjectId changes
   useEffect(() => {
-    loadFiles();
-    if (refreshRef) {
-      refreshRef.current = loadFiles;
+    if (currentProjectId) {
+      loadFiles();
+      if (refreshRef) {
+        refreshRef.current = loadFiles;
+      }
+    } else {
+      setItems([]);
     }
-  }, [loadFiles, refreshRef]);
+  }, [loadFiles, refreshRef, currentProjectId]);
+
+  // Update current project ID when localStorage changes
+  useEffect(() => {
+    const handleStorageChange = () => {
+      try {
+        const currentProject = localStorage.getItem('aiuxpot-current-project');
+        if (currentProject) {
+          const { id } = JSON.parse(currentProject);
+          setCurrentProjectId(id);
+        } else {
+          setCurrentProjectId(null);
+        }
+      } catch (error) {
+        console.error('Error checking project:', error);
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
 
   // Get current project ID
-  const getCurrentProjectId = useCallback(() => {
-    try {
-      const currentProject = localStorage.getItem('aiuxpot-current-project');
-      if (currentProject) {
-        const { id } = JSON.parse(currentProject);
-        return id;
-      }
-    } catch (error) {
-      console.error('Error getting current project:', error);
-    }
-    return null;
-  }, []);
+  const getCurrentProjectId = useCallback(() => currentProjectId, [currentProjectId]);
 
   // Save expanded nodes state
   useEffect(() => {

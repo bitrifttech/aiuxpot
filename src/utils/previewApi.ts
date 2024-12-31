@@ -13,13 +13,21 @@ interface Project {
   fileCount: number;
 }
 
+interface FileCache {
+  content: string;
+  timestamp: number;
+  hash: string;
+}
+
 class PreviewApi {
   private ws: WebSocket | null = null;
   private listeners: Map<string, Set<(data: any) => void>> = new Map();
-  private fileCache: Map<string, { content: string; timestamp: number }> = new Map();
+  private fileCache: Map<string, FileCache> = new Map();
   private currentProjectId: string | null = null;
   private reconnectAttempts: number = 0;
   private maxReconnectAttempts: number = 5;
+  private readonly CACHE_DURATION = 5000; // 5 seconds
+  private readonly MAX_CACHE_SIZE = 100; // Maximum number of cached files
 
   constructor() {
     // Try to restore current project from localStorage
@@ -32,6 +40,9 @@ class PreviewApi {
     } catch (error) {
       console.error('Error restoring current project:', error);
     }
+
+    // Clean cache periodically
+    setInterval(() => this.cleanCache(), 60000); // Clean every minute
   }
 
   connect(): void {
@@ -61,10 +72,7 @@ class PreviewApi {
 
           if (message.type === 'fileChanged') {
             const cacheKey = this.getCacheKey(message.data.projectId, message.data.path);
-            this.fileCache.set(cacheKey, {
-              content: message.data.content,
-              timestamp: Date.now()
-            });
+            this.fileCache.delete(cacheKey);
           }
         } catch (error) {
           console.error('Error handling WebSocket message:', error);
@@ -184,11 +192,21 @@ class PreviewApi {
     console.log('Updating file:', { projectId, path, type });
     
     try {
-      // Update cache immediately
+      const hash = await this.computeHash(content);
       const cacheKey = this.getCacheKey(projectId, path);
+      const cached = this.fileCache.get(cacheKey);
+
+      // Only update if content has changed
+      if (cached && cached.hash === hash) {
+        console.log('File content unchanged, skipping update');
+        return;
+      }
+
+      // Update cache immediately
       this.fileCache.set(cacheKey, {
         content,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        hash
       });
 
       const response = await fetch(`${API_BASE}/projects/${projectId}/files/${path}`, {
@@ -199,17 +217,19 @@ class PreviewApi {
         body: JSON.stringify({ 
           content, 
           type,
-          timestamp: Date.now() 
+          timestamp: Date.now(),
+          hash
         }),
       });
 
       if (!response.ok) {
         const error = await response.text();
+        // Invalidate cache on error
+        this.fileCache.delete(cacheKey);
         throw new Error(error || 'Failed to update file');
       }
 
-      console.log('File updated successfully:', { projectId, path });
-      this.notifyListeners('fileChanged', { projectId, path, content, type });
+      this.enforceMaxCacheSize();
     } catch (error) {
       console.error('Error updating file:', error);
       throw error;
@@ -222,7 +242,9 @@ class PreviewApi {
       // Check cache first
       const cacheKey = this.getCacheKey(projectId, path);
       const cached = this.fileCache.get(cacheKey);
-      if (cached && Date.now() - cached.timestamp < 5000) { // 5 second cache
+      const now = Date.now();
+
+      if (cached && now - cached.timestamp < this.CACHE_DURATION) {
         console.log('Returning cached file:', { projectId, path });
         return cached.content;
       }
@@ -241,17 +263,19 @@ class PreviewApi {
       }
 
       const content = await response.text();
-      console.log('File content received:', { projectId, path, size: content.length });
+      const hash = await this.computeHash(content);
 
-      // Update cache
+      // Update cache with new content and hash
       this.fileCache.set(cacheKey, {
         content,
-        timestamp: Date.now()
+        timestamp: now,
+        hash
       });
 
+      this.enforceMaxCacheSize();
       return content;
     } catch (error) {
-      console.error('Error getting file:', error);
+      console.error('Error fetching file:', error);
       throw error;
     }
   }
@@ -301,6 +325,39 @@ class PreviewApi {
 
   private getCacheKey(projectId: string, path: string): string {
     return `${projectId}:${path}`;
+  }
+
+  private cleanCache() {
+    const now = Date.now();
+    for (const [key, cache] of this.fileCache.entries()) {
+      if (now - cache.timestamp > this.CACHE_DURATION) {
+        this.fileCache.delete(key);
+      }
+    }
+  }
+
+  private async computeHash(content: string): Promise<string> {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(content);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  private enforceMaxCacheSize() {
+    if (this.fileCache.size > this.MAX_CACHE_SIZE) {
+      // Remove oldest entries
+      const entries = Array.from(this.fileCache.entries());
+      entries.sort((a, b) => a[1].timestamp - b[1].timestamp);
+      const toRemove = entries.slice(0, entries.length - this.MAX_CACHE_SIZE);
+      toRemove.forEach(([key]) => this.fileCache.delete(key));
+    }
+  }
+
+  forceRefresh(path: string): void {
+    const projectId = this.getCurrentProject();
+    const cacheKey = this.getCacheKey(projectId, path);
+    this.fileCache.delete(cacheKey);
   }
 }
 
