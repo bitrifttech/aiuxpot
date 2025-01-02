@@ -11,12 +11,52 @@ interface AppearanceSettings {
   showMiniMap: boolean;
 }
 
-interface AISettings {
-  provider: string;
-  model: string;
-  apiKey: string;
+interface AIModelConfig {
+  enabled: boolean;
   temperature: number;
   maxTokens: number;
+  topP: number;
+  frequencyPenalty: number;
+  presencePenalty: number;
+  priority?: number;
+  contextLength?: number;
+}
+
+interface AIProviderConfig {
+  apiKey: string;
+  baseUrl?: string;
+  enabled: boolean;
+  models: string[];
+}
+
+interface RequestDefaults {
+  maxTokens: number;
+  temperature: number;
+  topP: number;
+  frequencyPenalty: number;
+  presencePenalty: number;
+  contextLength: number;
+}
+
+interface UsageLimits {
+  maxRequestsPerMinute: number;
+  maxTokensPerDay: number;
+  maxConcurrentRequests: number;
+  maxRequestsPerDay: number;
+  maxCostPerDay: number;
+  resetTime: string;
+}
+
+interface AISettings {
+  defaultProvider: string;
+  providers: {
+    [key: string]: AIProviderConfig;
+  };
+  modelPreferences: {
+    [key: string]: AIModelConfig;
+  };
+  requestDefaults: RequestDefaults;
+  usageLimits: UsageLimits;
 }
 
 interface GeneralSettings {
@@ -72,11 +112,78 @@ const defaultSettings: GlobalSettings = {
     showMiniMap: true,
   },
   ai: {
-    provider: 'openai',
-    model: 'gpt-4',
-    apiKey: '',
-    temperature: 0.7,
-    maxTokens: 2000,
+    defaultProvider: 'openai',
+    providers: {
+      openai: {
+        apiKey: '',
+        baseUrl: 'https://api.openai.com/v1',
+        enabled: true,
+        models: ['gpt-4', 'gpt-3.5-turbo'],
+      },
+      anthropic: {
+        apiKey: '',
+        enabled: false,
+        models: ['claude-2', 'claude-instant'],
+      },
+    },
+    modelPreferences: {
+      'gpt-4': {
+        enabled: true,
+        temperature: 0.7,
+        maxTokens: 2000,
+        topP: 1,
+        frequencyPenalty: 0,
+        presencePenalty: 0,
+        priority: 1,
+        contextLength: 8000,
+      },
+      'gpt-3.5-turbo': {
+        enabled: true,
+        temperature: 0.7,
+        maxTokens: 2000,
+        topP: 1,
+        frequencyPenalty: 0,
+        presencePenalty: 0,
+        priority: 2,
+        contextLength: 4000,
+      },
+      'claude-2': {
+        enabled: false,
+        temperature: 0.7,
+        maxTokens: 2000,
+        topP: 1,
+        frequencyPenalty: 0,
+        presencePenalty: 0,
+        priority: 1,
+        contextLength: 100000,
+      },
+      'claude-instant': {
+        enabled: false,
+        temperature: 0.7,
+        maxTokens: 2000,
+        topP: 1,
+        frequencyPenalty: 0,
+        presencePenalty: 0,
+        priority: 2,
+        contextLength: 100000,
+      },
+    },
+    requestDefaults: {
+      maxTokens: 2000,
+      temperature: 0.7,
+      topP: 1,
+      frequencyPenalty: 0,
+      presencePenalty: 0,
+      contextLength: 8000,
+    },
+    usageLimits: {
+      maxRequestsPerMinute: 60,
+      maxTokensPerDay: 100000,
+      maxConcurrentRequests: 5,
+      maxRequestsPerDay: 1000,
+      maxCostPerDay: 10,
+      resetTime: '00:00',
+    },
   },
   general: {
     language: 'en',
