@@ -263,6 +263,106 @@ graph TD
    - Memoized components
    - Virtual scrolling for large files
 
+## File System Implementation
+
+#### Components
+
+##### `src/components/file-tree/file-tree.tsx`
+**Purpose**: Renders a hierarchical tree view of files and directories.
+**Type**: React Functional Component
+**Dependencies**:
+- lucide-react (icons)
+- @/contexts/filesystem-context
+- @/components/ui/*
+
+**Key Features**:
+- Expandable/collapsible directory nodes
+- File/directory selection
+- Visual indicators for files and directories
+- Indentation based on hierarchy level
+
+##### `src/components/file-pane.tsx`
+**Purpose**: Main file explorer component with file operations UI.
+**Type**: React Functional Component
+**Dependencies**:
+- @/contexts/filesystem-context
+- @/components/file-tree/file-tree
+- @/components/ui/*
+
+**Key Features**:
+- File/directory creation dialog
+- File system navigation
+- File operations menu
+
+#### Context and State Management
+
+##### `src/contexts/filesystem-context.tsx`
+**Purpose**: Provides file system state and operations to components.
+**Type**: React Context Provider
+**Dependencies**:
+- @/types/filesystem
+- @/reducers/filesystem-reducer
+- @/lib/filesystem/filesystem-service
+
+**Key Features**:
+- File system state management
+- File operation methods (create, delete, rename, move)
+- Node expansion/selection state
+- Integration with file system service
+
+#### Types and Interfaces
+
+##### `src/types/filesystem.ts`
+**Purpose**: TypeScript definitions for file system entities and operations.
+**Key Types**:
+```typescript
+interface FileSystemNode {
+  id: string;
+  name: string;
+  path: string;
+  type: 'file' | 'directory';
+  children?: FileSystemNode[];
+  parent?: string;
+  metadata?: {
+    size?: number;
+    modified?: Date;
+    created?: Date;
+    extension?: string;
+  };
+}
+
+interface FileSystemState {
+  root: FileSystemNode;
+  expandedNodes: Set<string>;
+  selectedNode?: string;
+}
+```
+
+#### Services
+
+##### `src/lib/filesystem/filesystem-service.ts`
+**Purpose**: Handles file system operations and persistence.
+**Type**: Singleton Service Class
+**Key Features**:
+- File system initialization
+- File/directory CRUD operations
+- Path management
+- File metadata handling
+
+#### State Management
+
+##### `src/reducers/filesystem-reducer.ts`
+**Purpose**: Manages file system state updates.
+**Type**: Redux-style Reducer
+**Key Actions**:
+- SET_ROOT: Initialize file system
+- TOGGLE_NODE: Expand/collapse directories
+- SELECT_NODE: Select files/directories
+- ADD_NODE: Create new files/directories
+- DELETE_NODE: Remove files/directories
+- RENAME_NODE: Rename files/directories
+- MOVE_NODE: Move files/directories
+
 ## Server Architecture
 
 ### Overview
